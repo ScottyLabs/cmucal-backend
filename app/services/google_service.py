@@ -75,6 +75,7 @@ def fetch_events_for_calendars(credentials, calendar_ids):
                 end = event.get("end", {})
                 is_all_day = "date" in start
                 all_events.append({
+                    "gcalEventId": event.get("id"),
                     "title": event.get("summary", "No Title"),
                     "start": start.get("dateTime") or start.get("date"),
                     "end": end.get("dateTime") or end.get("date"),

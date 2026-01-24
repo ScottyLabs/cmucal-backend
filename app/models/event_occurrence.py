@@ -9,13 +9,15 @@ from app.models.recurrence_override import rrule_from_db_recurrence_override
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 from copy import deepcopy
+import enum
 from app.utils.date import _ensure_aware, _parse_iso_aware, normalize_occurrence, normalize_set_to_tz
 
-TRACE_EVENT_ID = None  # Set to an event ID to enable tracing
 
+TRACE_EVENT_ID = None  # Set to an event ID to enable tracing
 def trace(event, *msg):
     if event and event.id == TRACE_EVENT_ID:
         print("🧭 TRACE:", *msg)
+
 
 def apply_overrides(
     occ_start: datetime,
@@ -331,6 +333,74 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
     )
     return f"Populated {count} occurrences for event {event.id}"
 
+def update_event_occurrence(db, event_id: int, org_id: int, category_id: int, title: str, 
+                          start_datetime, end_datetime, recurrence: RecurrenceType,
+                          event_saved_at: str, 
+                          is_all_day: bool, user_edited: List[int], description: str = None, 
+                          location: str = None, source_url: str = None):
+    """
+    Update an event occurrence in the database.
+
+    Args:
+        db: Database session.
+        event_id: ID of the event.
+        start_time: Start time of the occurrence in ISO format.
+        end_time: End time of the occurrence in ISO format.
+
+    Returns:
+        The created EventOccurrence object.
+    """
+    existing_occurrence = db.query(EventOccurrence).filter_by(
+        event_id=event.id,
+        start_datetime=start_datetime  # or some unique combination
+    ).first()
+
+    start_dt = _parse_iso_aware(start_datetime) if isinstance(start_datetime, str) else start_datetime
+    end_dt   = _parse_iso_aware(end_datetime)   if isinstance(end_datetime, str)   else end_datetime
+    saved_at = _parse_iso_aware(event_saved_at) if isinstance(event_saved_at, str) else event_saved_at
+    
+    if existing_occurrence:
+        # Update fields in-place
+        existing_occurrence.title = title
+        existing_occurrence.end_datetime = end_dt
+        existing_occurrence.event_saved_at = saved_at
+        existing_occurrence.recurrence = recurrence
+        existing_occurrence.is_all_day = is_all_day
+        existing_occurrence.user_edited = user_edited
+        existing_occurrence.description = description
+        existing_occurrence.location = location
+        existing_occurrence.source_url = source_url
+        db.flush()
+        db.refresh(existing_occurrence)
+        return existing_occurrence
+    else:
+        event_occurrence = EventOccurrence(
+            event_id=event_id,
+            org_id=org_id,
+            category_id=category_id,
+            title=title,
+            start_datetime=start_dt,
+            end_datetime=end_dt,
+            event_saved_at=saved_at,
+            recurrence=recurrence,
+            is_all_day=is_all_day,
+            user_edited=user_edited,
+            description=description,
+            location=location,
+            source_url=source_url)
+        db.add(event_occurrence)
+        db.flush()
+        db.refresh(event_occurrence)
+        return event_occurrence
+
+def as_dict(self):
+    result = {}
+    for c in self.__table__.columns:
+        value = getattr(self, c.name)
+        if isinstance(value, enum.Enum):   # catches RecurrenceType
+            value = value.value            # or value.name if you prefer
+        result[c.name] = value
+    return result
 def regenerate_event_occurrences_by_event_ids(db, event_ids: List[int]) -> Dict[int, str]:
     """
     Regenerate occurrences for a list of event IDs.
