@@ -808,7 +808,7 @@ def user_save_event():
         if not clerk_id:
             return jsonify({"error": "Missing user_id"}), 400
         user = get_user_by_clerk_id(db, clerk_id)
-
+        # print(data)
         new_entry = UserSavedEvent(
             user_id = user.id,
             event_id = data["event_id"],
@@ -857,6 +857,66 @@ def get_event_category(category_id):
         print("-------------------\n", jsonify(category_to_dict(category)), "-------------------\n")
         return jsonify(category_to_dict(category))
     
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@events_bp.route("/event_occurrences/<int:occurrence_id>", methods=["GET"])
+def get_event_occurrence(occurrence_id):
+    db = g.db
+    try:
+        clerk_id = request.args.get("user_id")
+        user = get_user_by_clerk_id(db, clerk_id) if clerk_id else None
+
+        occurrence = (
+            db.query(EventOccurrence)
+            .filter(EventOccurrence.id == occurrence_id)
+            .first()
+        )
+
+        if not occurrence:
+            return jsonify({"error": "Event occurrence not found"}), 404
+
+        event = (
+            db.query(Event)
+            .filter(Event.id == occurrence.event_id)
+            .first()
+        )
+
+        if not event:
+            return jsonify({"error": "Parent event not found"}), 404
+
+        org = db.query(Organization).filter_by(id=event.org_id).first()
+
+        user_saved = False
+        user_is_admin = False
+        if user:
+            user_saved = (
+                db.query(UserSavedEvent)
+                .filter_by(user_id=user.id, event_id=event.id)
+                .first()
+                is not None
+            )
+            user_is_admin = bool(
+                get_admin_by_org_and_user(db, event.org_id, user.id)
+            )
+
+        return jsonify({
+            "occurrence_id": occurrence.id,
+            "event_id": event.id,
+            "title": occurrence.title,
+            "start_datetime": occurrence.start_datetime.isoformat(),
+            "end_datetime": occurrence.end_datetime.isoformat(),
+            "location": occurrence.location,
+            "description": occurrence.description,
+            "org": org.name if org else None,
+            "event_type": event.event_type,
+            "category_id": event.category_id,
+            "user_saved": user_saved,
+            "user_is_admin": user_is_admin,
+        }), 200
+
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())

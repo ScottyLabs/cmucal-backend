@@ -63,6 +63,7 @@ def create_app():
             "origins": origins,
             "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization", "Clerk-User-Id"],
+            "expose_headers": ["Content-Type"],
         }}, supports_credentials=True)
 
 
