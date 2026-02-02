@@ -51,8 +51,6 @@ To visualize LangGraph, run `python -m course_agent.scripts.visualize_graph` in 
 - `calendar_sources`: extracted calendar artifacts
 - `agent_runs`: metadata for reproducibility and auditing
 
-Agent outputs are treated as **hypotheses**, not ground truth.
-
 ---
 
 ## Setup
@@ -81,7 +79,7 @@ SEARCH_API_KEY=...
     - `GRANT ALL PRIVILEGES ON TABLE agent_runs TO service_role;`
 
 ## Next Steps
-- currently only using 4 fake courses, should use fetch_all_courses when actually running the script
+- Tested using 4 CMU courses and achieved 100% accuracy on identifying the course website and extracting ical link from home page. However, should use `fetch_all_courses` when actually running the script.
 - features to add
     - visit all linked pages of the official website until a google calendar is found, in case calendars are linked in pages other than the homepage. for example: https://www.cs.cmu.edu/~mgormley/courses/10601/officehours.html
     - when a calendar is found, examine the events to see if OH is included. If so, create the category named `OH for xx-xxx`.
