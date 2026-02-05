@@ -79,8 +79,8 @@ class SupplementalInstructionScraper(BaseScraper):
                 - recurrence_frequency: "WEEKLY"
                 - recurrence_interval: 1
                 - recurrence_by_day: "TH"
-                - start_datetime: datetime object (date is arbitrary)
-                - end_datetime: datetime object (date is arbitrary)
+                - start_datetime: datetime object 6pm (date is arbitrary)
+                - end_datetime: datetime object 7pm (date is arbitrary)
                 - location: "POS 282"
 
 

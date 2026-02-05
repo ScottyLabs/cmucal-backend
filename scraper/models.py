@@ -43,10 +43,7 @@ class CourseResource:
         self.course_id = course_id
         self.course_name = course_name
         self.professor = professor
-        self.instructor = instructor
-        self.events = events
-
-    def to_json(self):
+        self.instructor = instructorSupplementalInstruction
         json = {
             "resource_type": self.resource_type,
             "resource_source": self.resource_source,
@@ -157,7 +154,7 @@ class ScheduleOfClasses:
 
 class SupplementalInstruction:
     """
-    Example:
+    Example (shown as json):
     {
         "course_num": "03121",
         "course_name": "Modern Biology",
