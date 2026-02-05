@@ -24,6 +24,7 @@ dependencies = [
     "alembic",
     "psycopg2-binary",
     "pymongo",
+    "supabase",
 
     # Auth / security
     "bcrypt",
@@ -53,6 +54,16 @@ dependencies = [
     "google-api-python-client",
     "google-auth",
     "google-auth-oauthlib",
+
+    # LLM / Agents
+    "langchain",
+    "langchain-openai",
+    "langgraph",
+    "openai",
+    "tiktoken",
+
+    # Visualization (LangGraph)
+    "graphviz",
 
     # Misc
     "inflect",

@@ -24,6 +24,7 @@ def event_occurrence_to_dict(occurrence: EventOccurrence):
 
 @schedule_bp.route('/', methods=['GET'])
 def get_schedule_route():
+    """returns the user's schedule with courses and clubs, their categories, and event occurrences"""
     clerk_user_id = request.headers.get('Clerk-User-Id')
     schedule_id = request.args.get('schedule_id')
     user = get_current_user(clerk_user_id)
@@ -110,32 +111,19 @@ def get_schedule_route():
                     ).all()
 
                     # Convert regular events to the same format as occurrences
-                    event_list = [{
-                        "id": event.id,
-                        "title": event.title,
-                        "description": event.description,
-                        "start_datetime": event.start_datetime.isoformat(),
-                        "end_datetime": event.end_datetime.isoformat(),
-                        "location": event.location,
-                        "is_all_day": event.is_all_day,
-                        "source_url": event.source_url,
-                        "recurrence": None,
-                        "event_id": event.id,
-                        "org_id": event.org_id,
-                        "category_id": event.category_id,
-                    } for event in events]
-                    
-                    # Get event occurrences if any exist
                     event_ids = [e.id for e in events]
+
+                    occurrences = []
                     if event_ids:
                         occurrences = db.query(EventOccurrence).filter(
                             EventOccurrence.event_id.in_(event_ids)
                         ).all()
-                        event_list.extend([event_occurrence_to_dict(o) for o in occurrences])
-                    
-                    clubs[org.id]["events"][category.name] = event_list
 
-        return jsonify({"courses": list(courses.values()), "clubs": list(clubs.values())})
+                    clubs[org.id]["events"][category.name] = [
+                        event_occurrence_to_dict(o) for o in occurrences
+                    ]
+
+        return jsonify({"courses": list(courses.values()), "clubs": list(clubs.values()), "schedule_id": schedule.id})
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())

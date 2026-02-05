@@ -1,0 +1,10 @@
+supabase
+python-dotenv
+requests
+beautifulsoup4
+graphviz
+langchain
+langchain-openai
+langgraph
+openai
+tiktoken

@@ -21,7 +21,7 @@ venv/
 
 - Once activated, you can install dependencies by
     - dev environment: `pip install -e ".[dev]"`
-    - production environment: `pip install -e .`
+    - production environment: `pip install .`
 
 <!-- - Once activated, you can install dependencies by `pip install -r requirements.txt`, `pip install -e .`, and save them by running `pip freeze > requirements.txt` -->
 - If you encounter an error with psycogp2, run `brew install postgresql` first.
@@ -59,14 +59,11 @@ APP_ENV=production alembic upgrade head
 
 - `upgrade head` = run migrations + bump version.
 - `stamp head` = bump version only, no migrations executed.
+- `alembic downgrade -1` = undo the latest migration
 
 ## 6. Course data
-(ignore this unless told otherwise) IF need to scrape data from cmu schedule of classes
-1. `git checkout rust` 
-2. Follow the instructions in the `rust` directory's README file. 
-3. Then `git checkout main` 
-4. Run `flask import-courses`
-
+- see scraper readme instructions on `export_soc`. Edit Railway cron job at  [this link](https://railway.com/project/065650eb-f1b3-4b72-9bdc-e0d0a9457205?environmentId=5b57ba27-25e6-44e5-91b8-6b602ae891f3
+). 
 ## 7. Scraped Info
 (ignore this unless told otherwise) IF need to scrape data from handshake, tartanconnect, si, peer tutoring
 1. `git pull` the scraper branch, and switch to this branch

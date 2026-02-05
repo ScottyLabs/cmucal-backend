@@ -1,11 +1,29 @@
 # Updated README
-1. `cd scraper`
+<!-- 1. `cd scraper`
 2. Run:
 `python exporters/handshake_export_to_excel.py`
 `python exporters/tartanconnect_export_to_excel.py`
 `python exporters/si_export_to_excel.py`
 `python exporters/peer_tutoring_export_to_excel.py`
-`python exporters/schedule_of_classes_export_to_excel.py`
+`python exporters/schedule_of_classes_export_to_excel.py` -->
+## Development Environment
+1. Activate the virtual environment at the root directory
+2. If running the schedule of classes scraper, make sure to change the semester_label in `scraper = ScheduleOfClassesScraper(db, semester_label="Spring_26")`. 
+    - Acceptable formats include `Spring_xx`, `Fall_xx`, `Summer1_xx`, `Summer2_xx`.
+    - Feel free to change the start and end dates of each semester in `scraper/helpers/semester.py` if needed.
+3. Run `python -m scraper.scripts.export_soc` to scrape data and add events to the DB.
+    - the script first creates org and category for each SOC event if those don't exist, then add events, recurrence_rules, and calls an endpoint to generate event occurrences.
+    - generating all events could take around an hour, please keep the terminal open during that time.
+
+* If need to delete, run this:
+```
+curl -X DELETE http://localhost:5001/api/events/batch_delete_events_by_params \
+-H "Content-Type: application/json" \
+--data-raw '{"semester":"Spring_26","source_url":"https://enr-apps.as.cmu.edu/open/SOC/SOCServlet/completeSchedule"}'
+```
+
+## Production Environment
+- created a cron job on Railway that calls `python -m scraper.scripts.export_soc`
 
 # Old README
 

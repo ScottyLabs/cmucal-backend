@@ -6,7 +6,7 @@ from app.models.user import update_user_calendar_id
 from app.services.google_service import create_cmucal_calendar
 from app.models.organization import create_organization
 from app.models.admin import create_admin, get_categories_for_admin_user, get_role
-from app.models.schedule import create_schedule
+from app.models.schedule import create_schedule, delete_schedule
 from app.models.schedule_category import create_schedule_category
 from app.models.schedule_org import create_schedule_org, remove_schedule_org
 from app.models.category import join_org_and_to_dict
@@ -104,6 +104,29 @@ def create_schedule_record():
         schedule = create_schedule(db, user_id=user_id, name=name)
         db.commit()
         return jsonify({"status": "schedule created", "user_id": user_id, "schedule_id": schedule.id}), 201
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@users_bp.route("/delete_schedule", methods=["DELETE"])
+def delete_schedule_record():
+    db = g.db
+    try:
+        # Try to get data from JSON body, fallback to query args
+        data = request.get_json(silent=True) or {}
+        schedule_id = data.get("schedule_id") or request.args.get("schedule_id")
+        
+        if not schedule_id:
+            return jsonify({"error": "Missing schedule_id"}), 400
+        
+        success = delete_schedule(db, schedule_id=schedule_id)
+        db.commit()
+        
+        if success:
+            return jsonify({"status": "schedule deleted", "schedule_id": schedule_id}), 200
+        else:
+            return jsonify({"error": "Schedule not found"}), 404
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())

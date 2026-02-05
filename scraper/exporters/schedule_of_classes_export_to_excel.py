@@ -27,9 +27,9 @@ def run_scrape_and_export():
 
         # Convert list of resource objects to a pandas DataFrame
         df = pd.DataFrame([{
-            'Course ID': resource.course_id,
+            'Course Num': resource.course_num,
             'Course Name': resource.course_name,
-            'Event Type': resource.event_type,
+            'Lecture Session': resource.lecture_section,
             'Lecture Days': resource.lecture_days,
             'Lecture Time Start': resource.lecture_time_start,
             'Lecture Time End': resource.lecture_time_end,

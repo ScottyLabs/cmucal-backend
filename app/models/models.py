@@ -1,7 +1,7 @@
 from typing import List, Optional
 
-from sqlalchemy import ARRAY, BigInteger, Boolean, Column, Date, DateTime, Double, Enum, ForeignKeyConstraint, SmallInteger, Identity, Numeric, PrimaryKeyConstraint, Table, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import OID
+from sqlalchemy import ARRAY, BigInteger, Boolean, Column, Date, DateTime, Double, Enum, ForeignKeyConstraint, SmallInteger, Identity, Numeric, PrimaryKeyConstraint, Table, Text, UniqueConstraint, text, Float
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import datetime
 from app.services.db import Base
@@ -18,6 +18,17 @@ class CrosslistGroup(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     course_crosslist: Mapped[List['CourseCrosslist']] = relationship('CourseCrosslist', back_populates='group')
+
+class AgentRun(Base):
+    __tablename__ = 'agent_runs'
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
+
+    agent_version: Mapped[str] = mapped_column(Text)
+
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+
+    course_websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='agent_run')
 
 class Academic(Base):
     __tablename__ = 'academics'
@@ -70,17 +81,58 @@ class Organization(Base):
 class Course(Base):
     __tablename__ = 'courses'
     __table_args__ = (
+        UniqueConstraint("course_number", name="courses_course_number_key"),
         ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='courses_org_id_fkey'),
         # PrimaryKeyConstraint('id', name='courses_pkey')
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
     course_number: Mapped[str] = mapped_column(Text)
+    course_name: Mapped[str] = mapped_column(Text)
     org_id: Mapped[int] = mapped_column(BigInteger)
+    semesters: Mapped[Optional[list]] = mapped_column(ARRAY(Text()))
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='courses')
     course_crosslist: Mapped[List['CourseCrosslist']] = relationship('CourseCrosslist', back_populates='course')
+    websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='course', cascade='all, delete-orphan')
+
+
+class CourseWebsite(Base):
+    __tablename__ = 'course_websites'
+    __table_args__ = (
+        UniqueConstraint(
+            'course_id',
+            'url',
+            name='course_websites_course_url_key',
+        ),
+        ForeignKeyConstraint(
+            ['course_id'],
+            ['courses.id'],
+            ondelete='CASCADE',
+            name='course_websites_course_id_fkey',
+        ),
+        ForeignKeyConstraint(
+            ['agent_run_id'],
+            ['agent_runs.id'],
+            ondelete='CASCADE',
+            name='course_websites_agent_run_id_fkey',
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
+    course_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    agent_run_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[Optional[str]] = mapped_column(Text)
+    relevance_score: Mapped[Optional[float]] = mapped_column(Float)
+    is_verified: Mapped[bool] = mapped_column(Boolean, server_default=text('false'))
+    verification_notes: Mapped[Optional[str]] = mapped_column(Text)
+    agent_debug: Mapped[Optional[dict]] = mapped_column(JSONB)
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+
+    course: Mapped['Course'] = relationship('Course',back_populates='websites')
+    agent_run: Mapped['AgentRun'] = relationship('AgentRun',back_populates='course_websites')
 
 class CourseCrosslist(Base):
     __tablename__ = 'course_crosslist'
@@ -171,46 +223,32 @@ class Category(Base):
     schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='category')
     event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='category')
     calendar_sources: Mapped[List['CalendarSource']] = relationship('CalendarSource', back_populates='category')
-    category_icals: Mapped[List['CategoryIcal']] = relationship('CategoryIcal', back_populates='category')
-
-
-class CategoryIcal(Base):
-    __tablename__ = 'category_icals'
-    __table_args__ = (
-        ForeignKeyConstraint(['calendar_source_id'], ['calendar_sources.id'], ondelete='CASCADE', name='org_icals_calendar_source_id_fkey'),
-        ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='org_icals_category_id_fkey'),
-        PrimaryKeyConstraint('category_id', 'calendar_source_id', name='org_icals_pkey')
-    )
-
-    category_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    calendar_source_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-
-    calendar_source: Mapped['CalendarSource'] = relationship('CalendarSource', back_populates='category_icals')
-    category: Mapped['Category'] = relationship('Category', back_populates='category_icals')
 
 class CalendarSource(Base):
     __tablename__ = 'calendar_sources'
     __table_args__ = (
+        UniqueConstraint('category_id', 'url', name='calendar_sources_category_url_key'),
         ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='calendar_sources_category_id_fkey'),
         ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='calendar_sources_org_id_fkey'),
         # PrimaryKeyConstraint('id', name='calendar_sources_pkey')
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    url: Mapped[str] = mapped_column(Text)
-    org_id: Mapped[int] = mapped_column(BigInteger)
-    category_id: Mapped[int] = mapped_column(BigInteger)
-    active: Mapped[bool] = mapped_column(Boolean)
+    # ownership
+    category_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    org_id: Mapped[int] = mapped_column(BigInteger, nullable=False)
+    # feed identity
+    url: Mapped[str] = mapped_column(Text, nullable=False)
+    active: Mapped[bool] = mapped_column(Boolean,server_default=text('true'),nullable=False)
+    notes: Mapped[Optional[str]] = mapped_column(Text)
+    # sync behavior
     fetch_interval_seconds: Mapped[int] = mapped_column(BigInteger, server_default=text("'21600'::bigint"))
     deletion_policy: Mapped[str] = mapped_column(Text, server_default=text("'mirror'::text"))
     all_day_handling: Mapped[str] = mapped_column(Text, server_default=text("'date_only'::text"))
     horizon_days: Mapped[int] = mapped_column(BigInteger, server_default=text("'180'::bigint"))
     sync_mode: Mapped[str] = mapped_column(Text, server_default=text("'delta'::text"))
-    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
     default_event_type: Mapped[Optional[str]] = mapped_column(Text)
-    created_by_user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # sync metadata
     etag: Mapped[Optional[str]] = mapped_column(Text)
     last_modified_hdr: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     content_hash: Mapped[Optional[str]] = mapped_column(Text)
@@ -218,13 +256,19 @@ class CalendarSource(Base):
     last_sync_status: Mapped[Optional[str]] = mapped_column(Text)
     last_error: Mapped[Optional[str]] = mapped_column(Text)
     next_due_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
+    # locking
     locked_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     lock_owner: Mapped[Optional[str]] = mapped_column(Text)
-    default_tzid: Mapped[Optional[str]] = mapped_column(Text)
-
+    # audit
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+    updated_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    # relationships
+    events: Mapped[List['Event']] = relationship("Event", back_populates="calendar_source", cascade="all, delete-orphan", passive_deletes=True)
     category: Mapped['Category'] = relationship('Category', back_populates='calendar_sources')
     org: Mapped['Organization'] = relationship('Organization', back_populates='calendar_sources')
-    category_icals: Mapped[List['CategoryIcal']] = relationship('CategoryIcal', back_populates='calendar_source')
+    
+    # default_tzid: Mapped[Optional[str]] = mapped_column(Text)
 
 class Schedule(Base):
     __tablename__ = 'schedules'
@@ -239,9 +283,9 @@ class Schedule(Base):
     name: Mapped[Optional[str]] = mapped_column(Text)
 
     user: Mapped['User'] = relationship('User', back_populates='schedules')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule')
-    schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule')
-    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule')
+    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule', cascade="all, delete-orphan")
+    schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule', cascade="all, delete-orphan")
+    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule', cascade="all, delete-orphan")
 
 
 class SyncedEvent(Base):
@@ -266,9 +310,21 @@ class SyncedEvent(Base):
 class Event(Base):
     __tablename__ = 'events'
     __table_args__ = (
+        ForeignKeyConstraint(['calendar_source_id'], ['calendar_sources.id'], ondelete='SET NULL', name='events_calendar_source_id_fkey'),
         ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='events_category_id_fkey'),
         ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='events_org_id_fkey'),
-        # PrimaryKeyConstraint('id', name='events_pkey')
+         # Dedupe SOC events only
+        UniqueConstraint(
+            "org_id",
+            "title",
+            "semester",
+            "start_datetime",
+            "end_datetime",
+            "location",
+            name="events_unique_soc",
+        ),
+        # Hard guarantee for ICS imports
+        UniqueConstraint("calendar_source_id", "ical_uid", name="events_unique_calendar_uid"),
     )
 
     id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
@@ -277,10 +333,15 @@ class Event(Base):
     start_datetime: Mapped[datetime.datetime] = mapped_column(DateTime(True))
     end_datetime: Mapped[datetime.datetime] = mapped_column(DateTime(True))
     is_all_day: Mapped[bool] = mapped_column(Boolean)
+    event_timezone: Mapped[str] = mapped_column(Text, nullable=False)
     location: Mapped[str] = mapped_column(Text)
+    # Can be UNKOWN but not null
+    semester: Mapped[str] = mapped_column(Text)
     user_edited: Mapped[Optional[list]] = mapped_column(ARRAY(BigInteger()))
     org_id: Mapped[int] = mapped_column(BigInteger)
     category_id: Mapped[int] = mapped_column(BigInteger)
+    calendar_source_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+
     description: Mapped[Optional[str]] = mapped_column(Text)
     source_url: Mapped[Optional[str]] = mapped_column(Text)
     event_type: Mapped[Optional[str]] = mapped_column(Text)
@@ -291,12 +352,13 @@ class Event(Base):
     occurrences_valid_through: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
     last_occurrence_build_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(True))
 
+    calendar_source: Mapped[Optional['CalendarSource']] = relationship('CalendarSource', back_populates='events')
     category: Mapped['Category'] = relationship('Category', back_populates='events')
     org: Mapped['Organization'] = relationship('Organization', back_populates='events')
-    event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='event')
-    event_tags: Mapped[List['EventTag']] = relationship('EventTag', back_populates='event')
-    recurrence_rules: Mapped[List['RecurrenceRule']] = relationship('RecurrenceRule', back_populates='event')
-    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='event')
+    event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='event', passive_deletes=True)
+    event_tags: Mapped[List['EventTag']] = relationship('EventTag', back_populates='event', passive_deletes=True)
+    recurrence_rules: Mapped[List['RecurrenceRule']] = relationship('RecurrenceRule', back_populates='event', passive_deletes=True)
+    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='event', passive_deletes=True)
 
     def as_dict(self):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
@@ -409,6 +471,7 @@ class RecurrenceRule(Base):
     by_month_day: Mapped[Optional[list]] = mapped_column(SmallInteger)
     by_day: Mapped[Optional[list]] = mapped_column(ARRAY(Text()))
     orig_until: Mapped[Optional[datetime.date]] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_generated_at: Mapped[Optional[datetime.datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     event: Mapped['Event'] = relationship('Event', back_populates='recurrence_rules')
     event_overrides: Mapped[List['EventOverride']] = relationship('EventOverride', back_populates='rrule')

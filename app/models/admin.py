@@ -88,6 +88,16 @@ def delete_admin(db, org_id: int, user_id: int):
         return True
     return False
 
+def get_admins_by_org(db, org_id: int) -> List[Admin]:
+    """
+    Retrieve all admins for a specific organization.
+    
+    Args:
+        db: Database session.
+        org_id: ID of the organization. 
+    """
+    return db.query(Admin).filter(Admin.org_id == org_id).all()
+
 def get_categories_for_admin_user(db, user_id: int):
     """
     Retrieve all categories where the user is an admin or manager.
@@ -102,6 +112,7 @@ def get_categories_for_admin_user(db, user_id: int):
     Returns:
         A list of Category objects
     """
+    
     # Get all relevant admin entries
     admin_entries = db.query(Admin).filter(
         Admin.user_id == user_id,

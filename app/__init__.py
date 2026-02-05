@@ -1,27 +1,18 @@
 # Initializes the Flask app, database, and JWT authentication.
 import os
-from dotenv import load_dotenv
-from pathlib import Path
 from flask import Flask,g
 from werkzeug.middleware.proxy_fix import ProxyFix
 from app.services.db import get_session
 
-# Load environment variables from .env file BEFORE other imports
-def detect_env() -> str:
-    # Respect explicit setting (e.g., in Railway dashboard)
-    app_env = os.getenv("APP_ENV")
-    if app_env:
-        return app_env.lower()
-    # If we’re on Railway and APP_ENV isn’t set, assume production
-    if os.getenv("RAILWAY_PROJECT_ID") or os.getenv("RAILWAY_ENVIRONMENT"):
-        return "production"
-    # Local default
-    return "development"
+from app.env import load_env
+ENV = load_env()
 
-ENV = detect_env()
-# print(f"[init] Detected APP_ENV={ENV}")
-dotfile = f".env.{ENV}"
-load_dotenv(dotfile, override=False)
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+)
 
 from app.config import DevelopmentConfig, TestingConfig, ProductionConfig
 from app.services.db import init_db
@@ -60,6 +51,7 @@ def create_app():
         from app.api.google import google_bp
         from app.api.events import events_bp
         from app.api.schedule import schedule_bp
+        from app.api.admin import admin_bp
         from app.cli import import_courses_command
 
         origins = [o.strip() for o in os.getenv(
@@ -80,6 +72,7 @@ def create_app():
         app.register_blueprint(google_bp, url_prefix="/api/google")
         app.register_blueprint(events_bp, url_prefix="/api/events")
         app.register_blueprint(schedule_bp, url_prefix="/api/schedule")
+        app.register_blueprint(admin_bp, url_prefix="/api/admin")
         app.register_blueprint(base_bp)
         
         # Register CLI command

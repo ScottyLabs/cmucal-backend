@@ -10,6 +10,6 @@ def user_factory(db):
             **kwargs,
         )
         db.add(user)
-        db.commit()
+        db.flush()
         return user
     return create_user

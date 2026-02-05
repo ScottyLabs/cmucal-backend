@@ -1,3 +1,4 @@
+from zoneinfo import ZoneInfo
 from app.models.models import (
     Event, RecurrenceRule, EventOccurrence,
     RecurrenceExdate, RecurrenceRdate, EventOverride, RecurrenceOverride,
@@ -8,8 +9,13 @@ from app.models.recurrence_override import rrule_from_db_recurrence_override
 from datetime import datetime, timedelta, timezone
 from typing import List, Dict, Tuple, Optional
 from copy import deepcopy
-from app.utils.date import _ensure_aware, _parse_iso_aware
+from app.utils.date import _ensure_aware, _parse_iso_aware, normalize_occurrence, normalize_set_to_tz
 
+TRACE_EVENT_ID = None  # Set to an event ID to enable tracing
+
+def trace(event, *msg):
+    if event and event.id == TRACE_EVENT_ID:
+        print("🧭 TRACE:", *msg)
 
 def apply_overrides(
     occ_start: datetime,
@@ -80,14 +86,26 @@ def apply_overrides(
         title    = event.title
         desc     = event.description
         loc      = event.location
-
+    
+    start_dt = normalize_occurrence(start_dt, ZoneInfo(event.event_timezone))
+    end_dt   = normalize_occurrence(end_dt, ZoneInfo(event.event_timezone))
     return start_dt, end_dt, title, desc, loc
 
+def delete_event_occurrences_by_event_id(db, event_id: int):
+    """
+    Delete all event occurrences for a given event ID.
+
+    Args:
+        db: Database session.
+        event_id: ID of the event whose occurrences are to be deleted.
+    """
+    db.query(EventOccurrence).filter_by(event_id=event_id).delete(synchronize_session=False)
+    db.flush()
 
 ### need to check type of event_saved_at, start_datetime, end_datetime before using them
 def save_event_occurrence(db, event_id: int, org_id: int, category_id: int, title: str, 
                           start_datetime, end_datetime, recurrence: RecurrenceType,
-                          event_saved_at: str, 
+                          event_saved_at: str, event_timezone: str,
                           is_all_day: bool, user_edited: List[int], description: str = None, 
                           location: str = None, source_url: str = None):
     """
@@ -102,9 +120,14 @@ def save_event_occurrence(db, event_id: int, org_id: int, category_id: int, titl
     Returns:
         The created EventOccurrence object.
     """
-    start_dt = _parse_iso_aware(start_datetime) if isinstance(start_datetime, str) else start_datetime
-    end_dt   = _parse_iso_aware(end_datetime)   if isinstance(end_datetime, str)   else end_datetime
+    event_tz = ZoneInfo(event_timezone)
+    start_dt = _parse_iso_aware(start_datetime) if isinstance(start_datetime, str) else start_datetime.astimezone(event_tz)
+    end_dt   = _parse_iso_aware(end_datetime)   if isinstance(end_datetime, str)   else end_datetime.astimezone(event_tz)
     saved_at = _parse_iso_aware(event_saved_at) if isinstance(event_saved_at, str) else event_saved_at
+
+    start_dt = start_dt.astimezone(timezone.utc)
+    end_dt   = end_dt.astimezone(timezone.utc)
+    saved_at = saved_at.astimezone(timezone.utc)
 
     event_occurrence = EventOccurrence(
         event_id=event_id,
@@ -139,9 +162,22 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
     Returns:
         A message indicating the number of occurrences populated.
     """
+    if event.id == TRACE_EVENT_ID:
+        print("🧭 TRACE: populate_event_occurrences()")
+
+    event_tz = ZoneInfo(event.event_timezone)
     # Defensive duration (end could be equal to start in some feeds)
-    end_datetime = _parse_iso_aware(event.end_datetime) if event.end_datetime else None
-    start_datetime = _parse_iso_aware(event.start_datetime) if event.start_datetime else None
+    end_datetime = _parse_iso_aware(event.end_datetime, event_tz) if event.end_datetime else None
+    start_datetime = _parse_iso_aware(event.start_datetime, event_tz) if event.start_datetime else None
+
+    trace(event, "event_tz =", event_tz)
+
+    trace(event,
+        "start_datetime =", event.start_datetime,
+        "end_datetime =", event.end_datetime,
+        "tz =", event_tz
+    )
+
     duration = (end_datetime or start_datetime) - start_datetime
     if duration.total_seconds() < 0:
         duration = timedelta(0)
@@ -159,11 +195,18 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
             temp_rule.until = min(_ensure_aware(temp_rule.until), six_months_later)
 
     print("➡️ rule.start_datetime =", rule.start_datetime)
-    print("➡️ rule.until =", rule.until)
-    print("➡️ temp_rule.until =", temp_rule.until)
+    # print("➡️ rule.until =", rule.until)
+    # print("➡️ temp_rule.until =", temp_rule.until)
+
+    trace(event,
+        "rule.start =", rule.start_datetime,
+        "rule.until =", rule.until,
+        "temp.until =", temp_rule.until
+    )
 
     # Build an rrule iterator from temp_rule
-    rrule_iter = get_rrule_from_db_rule(temp_rule)
+    rrule_iter = list(get_rrule_from_db_rule(temp_rule, event_tz))
+    trace(event, "RRULE count =", len(rrule_iter))
 
     # Pull EXDATE/RDATE/Overrides/RecurrenceOverrides from DB
     exdates = {
@@ -177,7 +220,7 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
     }
 
     overrides = {
-        _ensure_aware(o.recurrence_date): o
+        normalize_occurrence(_ensure_aware(o.recurrence_date), event_tz): o
         for o in db.query(EventOverride).filter_by(rrule_id=rule.id).all()
     }
 
@@ -189,7 +232,7 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
         try:
             ro_rrule = rrule_from_db_recurrence_override(ro)
             for ro_date in ro_rrule:
-                ro_date = _ensure_aware(ro_date)
+                ro_date = normalize_occurrence(_ensure_aware(ro_date), event_tz)
                 # If multiple patterns match the same date, later ones win
                 # (could add priority field later if needed)
                 recurrence_override_dates[ro_date] = ro
@@ -197,14 +240,21 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
             print(f"⚠️ Failed to expand RecurrenceOverride {ro.id}: {e}")
 
     # Start fresh for this event's occurrences
-    db.query(EventOccurrence).filter_by(event_id=event.id).delete(synchronize_session=False)
+    deleted = db.query(EventOccurrence).filter_by(event_id=event.id).delete(synchronize_session=False)
+    trace(event, "Deleted existing occurrences:", deleted)
 
     count = 0
     seen_starts = set()  # to avoid dupes when RDATE == RRULE date
 
     # 1) Generate occurrences from RRULE, skipping EXDATE and applying overrides
+    exdates = normalize_set_to_tz(exdates, event_tz)
+    rdates  = normalize_set_to_tz(rdates, event_tz)
+
     for occ_start in rrule_iter:
-        occ_start = _ensure_aware(occ_start)
+        occ_start = normalize_occurrence(occ_start, event_tz)
+
+        if event.id == TRACE_EVENT_ID and count < 3:
+            print("🧭 TRACE: occ_start =", occ_start)
 
         if occ_start in exdates:
             continue
@@ -213,13 +263,16 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
             occ_start, event, duration, overrides, recurrence_override_dates
         )
 
+        start_dt_utc = start_dt.astimezone(timezone.utc)
+        end_dt_utc   = end_dt.astimezone(timezone.utc)
+
         db.add(EventOccurrence(
             event_id=event.id,
             org_id=event.org_id,
             category_id=event.category_id,
             title=title,
-            start_datetime=start_dt,
-            end_datetime=end_dt,
+            start_datetime=start_dt_utc,
+            end_datetime=end_dt_utc,
             event_saved_at=event.last_updated_at,
             recurrence="RECURRING",
             is_all_day=event.is_all_day,
@@ -229,12 +282,12 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
             source_url=event.source_url,
         ))
 
-        seen_starts.add(start_dt)
+        seen_starts.add(start_dt.astimezone(timezone.utc))
         count += 1
 
     # 2) Add RDATEs that weren't already covered
     for rdate in sorted(rdates):
-        if rdate in exdates or rdate in seen_starts:
+        if rdate in exdates or rdate.astimezone(timezone.utc) in seen_starts:
             continue
 
         start_dt, end_dt, title, desc, loc = apply_overrides(
@@ -245,13 +298,16 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
         if not rule.count and (start_dt > six_months_later):
             continue
 
+        start_dt_utc = start_dt.astimezone(timezone.utc)
+        end_dt_utc   = end_dt.astimezone(timezone.utc)
+
         db.add(EventOccurrence(
             event_id=event.id,
             org_id=event.org_id,
             category_id=event.category_id,
             title=title,
-            start_datetime=start_dt,
-            end_datetime=end_dt,
+            start_datetime= start_dt_utc,
+            end_datetime=end_dt_utc,
             event_saved_at=event.last_updated_at,
             recurrence="RECURRING",
             is_all_day=event.is_all_day,
@@ -263,5 +319,63 @@ def populate_event_occurrences(db, event: Event, rule: RecurrenceRule):
 
         count += 1
 
+    # Mark successful regeneration
+    now = datetime.now(timezone.utc)
+    rule.last_generated_at = now
+    event.last_updated_at = now
+
     db.flush()
+    trace(event,
+        "Occurrences in session =",
+        db.query(EventOccurrence).filter_by(event_id=event.id).count()
+    )
     return f"Populated {count} occurrences for event {event.id}"
+
+def regenerate_event_occurrences_by_event_ids(db, event_ids: List[int]) -> Dict[int, str]:
+    """
+    Regenerate occurrences for a list of event IDs.
+
+    Args:
+        db: Database session.
+        event_ids: List of event IDs to regenerate occurrences for.
+    Returns:
+        number of occurrences regenerated, skipped
+    """
+    regenerated = 0
+    skipped = 0
+    start = datetime.now(timezone.utc)
+    for event_id in event_ids:
+        event = db.query(Event).get(event_id)
+
+        if event_id == TRACE_EVENT_ID:
+            print("🧭 TRACE: Found event", event_id)
+
+        if not event:
+            skipped += 1
+            continue
+
+        rule = db.query(RecurrenceRule).filter_by(event_id=event.id).first()
+
+        if event_id == TRACE_EVENT_ID:
+            print("🧭 TRACE: Rule exists?", bool(rule))
+
+        if not rule:
+            skipped += 1
+            continue
+
+        if rule.last_generated_at and rule.last_generated_at > event.last_updated_at:
+            if event_id == TRACE_EVENT_ID:
+                print("🧭 TRACE: SKIPPED due to timestamps", rule.last_generated_at, event.last_updated_at)
+            continue
+
+        try:
+            populate_event_occurrences(db, event, rule)
+        except Exception as e:
+            print("FAILED during populate:", e)
+            raise
+        regenerated += 1
+    end = datetime.now(timezone.utc)
+    # total minutes
+    total_time = (end - start).total_seconds() / 60
+    print(f"Regenerated occurrences for {regenerated} events, skipped {skipped} events in {total_time} minutes.")
+    return regenerated, skipped

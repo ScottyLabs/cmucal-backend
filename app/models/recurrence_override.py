@@ -8,7 +8,6 @@ from dateutil.rrule import (
 )
 from typing import List, Optional, Union
 from dateutil.parser import parse as parse_datetime
-from app.utils.date import _ensure_aware
 from app.models.recurrence_rule import parse_by_day_array
 
 
