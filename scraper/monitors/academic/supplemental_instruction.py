@@ -91,8 +91,8 @@ class SupplementalInstructionScraper(BaseScraper):
         parts = time_location_string.rsplit("-", 1)
         location = parts[1].strip()
         
-        # Split remaining by "," to get weekday and time range
-        day_time_parts = parts[0].split(",", 1)
+        # Split remaining by "@" to get weekday and time range
+        day_time_parts = parts[0].split("@", 1)
         weekday_name = day_time_parts[0].strip()
         time_range = day_time_parts[1].strip()
         
