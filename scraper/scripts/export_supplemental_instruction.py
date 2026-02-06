@@ -2,11 +2,11 @@
 
 from datetime import timedelta
 from dateutil.parser import isoparse
+from zoneinfo import ZoneInfo
 
 from app.env import load_env, get_api_base_url
 from app.models.enums import FrequencyType
 from scraper.helpers.event import event_identity
-from scraper.helpers.timezone import timezone_from_location
 from scraper.monitors.academic import SupplementalInstructionScraper
 from scraper.persistence.supabase_writer import get_supabase
 from scraper.persistence.supabase_events import insert_events
@@ -17,6 +17,7 @@ API_BASE_URL = get_api_base_url()
 
 SI_SOURCE_URL = "https://www.cmu.edu/student-success/programs/supp-inst.html"
 SI_SEMESTER = "SI"
+SI_TIMEZONE = ZoneInfo("America/New_York")
 CLEAR_CATEGORIES = True
 
 
@@ -43,19 +44,15 @@ def export_supplemental_instruction():
 
 def create_si_event(resource, org: dict, category: dict, time_location: dict, *, semester: str = SI_SEMESTER):
     location = time_location["location"]
-    tz = timezone_from_location(location)
+    tz = SI_TIMEZONE
 
+    # Parse start and end datetimes, and ensure they are timezone-aware
     start_dt = isoparse(time_location["start_datetime"])
     end_dt = isoparse(time_location["end_datetime"])
-    if start_dt.tzinfo is None:
-        start_dt = start_dt.replace(tzinfo=tz)
-    else:
-        start_dt = start_dt.astimezone(tz)
-    if end_dt.tzinfo is None:
-        end_dt = end_dt.replace(tzinfo=tz)
-    else:
-        end_dt = end_dt.astimezone(tz)
+    start_dt = start_dt.astimezone(tz)
+    end_dt = end_dt.astimezone(tz)
 
+    
     org_id = org["id"]
     category_id = category["id"]
     by_day = time_location["recurrence_by_day"]
@@ -97,10 +94,12 @@ def create_si_event(resource, org: dict, category: dict, time_location: dict, *,
 
 
 def setup_sasc_org(db):
+    # Check if SASC organization already exists
     res = db.table("organizations").select("id, name").eq("name", "SASC").execute()
     if res.data:
         return {"id": res.data[0]["id"], "name": res.data[0]["name"]}
-
+    
+    # Create SASC organization if it doesn't exist
     db.table("organizations").insert({
         "name": "SASC",
         "description": "Student Academic Success Center",
@@ -112,6 +111,7 @@ def setup_sasc_org(db):
 
 
 def setup_sasc_category(db, org: dict, course_num: str, clear: bool = False) -> dict:
+    # Check if SI category already exists
     category_name = f"SI {course_num}"
     org_id = org["id"]
 
@@ -122,6 +122,8 @@ def setup_sasc_category(db, org: dict, course_num: str, clear: bool = False) -> 
         .eq("name", category_name)
         .execute()
     )
+
+    # If category already exists, return it. Otherwise, create it.
     if res.data:
         row = res.data[0]
         category_id = row["id"]
@@ -137,6 +139,7 @@ def setup_sasc_category(db, org: dict, course_num: str, clear: bool = False) -> 
         row = res.data[0]
         category_id = row["id"]
 
+    # Clear events from category if clear is True
     if clear and category_id:
         db.table("events").delete().eq("category_id", category_id).execute()
 
