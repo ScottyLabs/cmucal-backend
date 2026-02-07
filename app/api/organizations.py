@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request, g
 from app.models.user import get_user_by_clerk_id, get_user_by_email, create_user_without_clerk, get_user_by_id
 from app.models.organization import create_organization, get_orgs_by_type, get_organization_by_name, get_organization_by_id
 from app.models.models import Organization, Category, Event, EventOccurrence
-from app.models.admin import create_admin, get_admin_by_org_and_user, get_admins_by_org
+from app.models.admin import create_admin, delete_admin, get_admin_by_org_and_user, get_admins_by_org
 from app.models.category import create_category, get_categories_by_org_id
 from app.services.ical import delete_events_for_calendar_source
 from app.utils.course_data import get_course_data
@@ -309,6 +309,27 @@ def create_admin_record():
         admin = create_admin(db, org_id=org_id, user_id=user_id, role=role, category_id=category_id)
         db.commit()
         return jsonify({"status": "admin created", "user": admin.user_id, "org": admin.org_id}), 200
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+@orgs_bp.route("/delete_admin", methods=["DELETE"])
+def delete_admin_record():
+    db = g.db
+    try:
+        data = request.get_json()
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Missing user_id"}), 400
+        org_id = data.get("org_id")
+        if not org_id:
+            return jsonify({"error": "Missing org_id"}), 400
+        
+        
+        admin = delete_admin(db, org_id=org_id, user_id=user_id) 
+        db.commit()
+        return jsonify({"status": "admin deleted", "user": admin.user_id, "org": admin.org_id}), 200
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())
