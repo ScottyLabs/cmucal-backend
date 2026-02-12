@@ -184,25 +184,67 @@ class User(Base):
     synced_events: Mapped[List['SyncedEvent']] = relationship('SyncedEvent', back_populates='user')
     user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='user')
 
-
 class Admin(Base):
     __tablename__ = 'admins'
     __table_args__ = (
-        ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='admins_category_id_fkey'),
-        ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='admins_org_id_fkey'),
         ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE', name='admins_user_id_fkey'),
-        PrimaryKeyConstraint('user_id', 'org_id', name='admins_pkey')
+        ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='admins_org_id_fkey'),
+        PrimaryKeyConstraint('user_id', 'org_id', name='admins_pkey'),
+    )
+
+    # Scope:
+    # - admin          → org_id NOT NULL
+    # - manager        → org_id NOT NULL
+    # - website_manager → org_id IS NULL
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    # Nullable ONLY for website_manager
+    org_id: Mapped[Optional[int]] = mapped_column(BigInteger, primary_key=True)
+    role: Mapped[str] = mapped_column(Text, nullable=False) # 'admin', 'manager', 'website_manager'
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+
+    user: Mapped['User'] = relationship('User', back_populates='admins')
+    org: Mapped[Optional['Organization']] = relationship('Organization', back_populates='admins')
+
+    admin_categories: Mapped[List['AdminCategory']] = relationship(
+        'AdminCategory',
+        back_populates='admin',
+        cascade='all, delete-orphan'
+    )
+
+class AdminCategory(Base):
+    __tablename__ = 'admin_categories'
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ['user_id', 'org_id'],
+            ['admins.user_id', 'admins.org_id'],
+            ondelete='CASCADE',
+            name='admin_categories_admin_fkey'
+        ),
+        ForeignKeyConstraint(
+            ['category_id'],
+            ['categories.id'],
+            ondelete='CASCADE',
+            name='admin_categories_category_id_fkey'
+        ),
+        PrimaryKeyConstraint(
+            'user_id',
+            'org_id',
+            'category_id',
+            name='admin_categories_pkey'
+        ),
     )
 
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     org_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    role: Mapped[Optional[str]] = mapped_column(Text)
-    category_id: Mapped[Optional[int]] = mapped_column(BigInteger)
+    category_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
 
-    category: Mapped[Optional['Category']] = relationship('Category', back_populates='admins')
-    org: Mapped['Organization'] = relationship('Organization', back_populates='admins')
-    user: Mapped['User'] = relationship('User', back_populates='admins')
+    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
+
+    admin: Mapped['Admin'] = relationship('Admin', back_populates='admin_categories')
+    category: Mapped['Category'] = relationship('Category', back_populates='admin_categories')
+
+
 
 
 class Category(Base):
@@ -218,7 +260,7 @@ class Category(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='categories')
-    admins: Mapped[List['Admin']] = relationship('Admin', back_populates='category')
+    admin_categories: Mapped[List['AdminCategory']] = relationship('AdminCategory', back_populates='category')
     events: Mapped[List['Event']] = relationship('Event', back_populates='category')
     schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='category')
     event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='category')
