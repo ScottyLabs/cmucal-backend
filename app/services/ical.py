@@ -706,9 +706,6 @@ from app.models.models import (
     EventOccurrence,
     EventTag,
     UserSavedEvent,
-    Academic,
-    Career,
-    Club,
     RecurrenceRule,
     RecurrenceExdate,
     RecurrenceRdate,
@@ -766,15 +763,6 @@ def delete_events_for_calendar_source(
     )
     db.execute(
         delete(UserSavedEvent).where(UserSavedEvent.event_id.in_(event_id_subq))
-    )
-    db.execute(
-        delete(Academic).where(Academic.event_id.in_(event_id_subq))
-    )
-    db.execute(
-        delete(Career).where(Career.event_id.in_(event_id_subq))
-    )
-    db.execute(
-        delete(Club).where(Club.event_id.in_(event_id_subq))
     )
 
     # Handle recurrence hierarchy

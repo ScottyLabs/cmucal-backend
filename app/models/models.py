@@ -18,18 +18,6 @@ class AgentRun(Base):
 
     course_websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='agent_run')
 
-class Academic(Base):
-    __tablename__ = 'academics'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='academics_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='academics_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    course_num: Mapped[Optional[str]] = mapped_column(Text)
-    course_name: Mapped[Optional[str]] = mapped_column(Text)
-    instructors: Mapped[Optional[list]] = mapped_column(ARRAY(Text()))
-
 
 class Career(Base):
     __tablename__ = 'careers'

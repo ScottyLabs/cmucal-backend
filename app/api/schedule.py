@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from sqlalchemy.orm import joinedload, subqueryload
-from app.models.models import User, Schedule, ScheduleCategory, Category, Organization, EventOccurrence, Academic, Event
+from app.models.models import User, Schedule, ScheduleCategory, Category, Organization, EventOccurrence, Event
 from app.utils.auth import get_current_user
 
 schedule_bp = Blueprint('schedule_bp', __name__)
