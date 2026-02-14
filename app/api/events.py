@@ -20,21 +20,23 @@ from app.services.ical import delete_events_for_calendar_source, import_ical_fee
 from app.errors.ical import ICalFetchError
 from app.models.calendar_source import create_calendar_source
 
-from app.models.category_ical import create_category_ical
 from app.models.google_event import get_event_id_by_google_event_id
 from app.utils.date import _parse_iso_aware
 
 events_bp = Blueprint("events", __name__)
 
-@events_bp.route("/create_event", methods=["POST"])
-def create_event_record():
+@events_bp.route("/create_event/form", methods=["POST"])
+def create_event_form():
+    """
+    Create individual event from input form upload
+    """
     db = g.db
     try:
         data = request.get_json()
-        pprint.pprint(data)
 
         if not request.is_json:
             return jsonify({"error": "Invalid JSON body"}), 400
+        
         title = data.get("title")
         description = data.get("description", None)
         start_datetime = data.get("start_datetime")
@@ -158,8 +160,9 @@ def create_event_record():
 
         return jsonify({"error": str(e)}), 500
 
-@events_bp.route("/read_gcal_link", methods=["POST"])
-def read_gcal_link():
+# Create from gcal link 
+@events_bp.route("/create_event/gcal", methods=["POST"])
+def create_event_gcal():
     db = g.db
     try:
         data = request.get_json()
@@ -250,115 +253,9 @@ def read_gcal_link():
             "error": "INTERNAL_SERVER_ERROR",
             "message": str(e),
         }), 500
-
-# @events_bp.route("/generate_more_occurrences", methods=["POST"])
-# def generate_more_occurrences():
-#     db = g.db
-#         try:
-#             data = request.get_json()
-#             event_id = data.get("event_id")
-#             event = db.query(Event).filter(Event.id == event_id).first()
-#             populate_event_occurrences(db, event_id=event_id)
-
-# should only be used for testing purposes
-@events_bp.route("/create_recurrence_rule", methods=["POST"])
-def create_recurrence_rules():
-    db = g.db
-    try:
-        data = request.get_json()
-        event_id = data.get("event_id")
-        frequency = data.get("frequency")
-        interval = data.get("interval")
-        start_datetime = data.get("start_datetime")
-        count = data.get("count", None)
-        until = data.get("until", None)
-        by_day = data.get("by_day", None)
-        by_month_day = data.get("by_month_day", None)
-        by_month = data.get("by_month", None)
         
-        if not event_id or not start_datetime or not frequency or not interval:
-            return jsonify({"error": "Missing event_id or start_datetime or frequency or interval"}), 400
-        
-        event = db.query(Event).filter(Event.id == event_id).first()
-        rule = add_recurrence_rule(db, 
-                                event_id=event_id, 
-                                frequency=frequency,
-                                interval=interval,
-                                start_datetime = start_datetime,
-                                count=count,
-                                until=until,
-                                by_day=by_day,
-                                by_month_day=by_month_day,
-                                by_month=by_month)
-        occurrence_msg = populate_event_occurrences(db, event=event, rule=rule)
-        db.commit()  # Only commit if all succeeded
-        return jsonify({"status": f"recurrence rules created. {occurrence_msg}"}), 201
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-# should only be used for testing purposes
-@events_bp.route("/create_single_event_occurrence", methods=["POST"])
-def create_single_event_occurrence():
-    db = g.db
-    try:
-        data = request.get_json()
-        event_id = data.get("event_id")
-        org_id = data.get("org_id")
-        category_id = data.get("category_id")
-        title = data.get("title")
-        start_datetime = data.get("start_datetime")
-        end_datetime = data.get("end_datetime")
-        recurrence = data.get("recurrence")
-        is_all_day = data.get("is_all_day", False)
-        user_edited = data.get("user_edited", None)
-        description = data.get("description", None)
-        location = data.get("location", None)
-        source_url = data.get("source_url", None)
-
-        if not event_id or not org_id or not category_id or not title or not start_datetime or not end_datetime or not recurrence:
-            return jsonify({"error": "Missing required fields"}), 400
-        
-        event = db.query(Event).filter(Event.id == event_id).first()
-        event_tz = ZoneInfo(event.event_timezone)
-        if not recurrence == "EXCEPTION":
-            event_saved_at = event.last_updated_at
-        else:
-            event_saved_at = datetime.now(timezone.utc)
-        if not event:
-            return jsonify({"error": "Event not found"}), 404
-        
-        start_dt = _parse_iso_aware(start_datetime, event_tz)
-        end_dt   = _parse_iso_aware(end_datetime, event_tz)
-        if start_dt.tzinfo is None or end_dt.tzinfo is None:
-            return jsonify({"error": "Datetime must be timezone-aware"}), 400
-
-        event_occurrence = save_event_occurrence(db, 
-                                            event_id=event_id, 
-                                            org_id=org_id, 
-                                            category_id=category_id, 
-                                            title=title,
-                                            start_datetime=start_dt,
-                                            end_datetime=end_dt,
-                                            recurrence=recurrence,
-                                            event_saved_at=event_saved_at,
-                                            is_all_day=is_all_day,
-                                            event_timezone=event.event_timezone,
-                                            user_edited=user_edited,
-                                            description=description,
-                                            location=location,
-                                            source_url=source_url)
-        
-        db.commit()  # Only commit if all succeeded
-        return jsonify({"status": f"event occurrence {event_occurrence.id} created."}), 201
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-        
-
-
+# Scrape info + recurrent rule -> Generate x events 
+# /create_event/recurrence
 @events_bp.route("/regenerate_occurrences_by_events", methods=["POST"])
 def regenerate_occurrences_by_events():
     db = g.db
@@ -387,72 +284,12 @@ def regenerate_occurrences_by_events():
         return jsonify({"error": str(e)}), 500
 
 
-@events_bp.route("/tags", methods=["GET"])
-def get_tags():
-    # print("🙇 geting tags 🙇")
-    db = g.db
-    try: 
-        # print("here we go")
-        tags = get_all_tags(db)
-        # print("tags, ", tags)
-        return jsonify([{"name": tag.name, "id": tag.id} for tag in tags]), 200
-    except Exception as e:
-
-        print("❌ Exception:", e)
-        return jsonify({"error": str(e)}), 500
-
-@events_bp.route("/<event_id>/tags", methods=["GET"])
-def get_event_tags(event_id):
-    print("🔗🔗🔗🏷🏷🏷😄 ", request.url)
-    db = g.db
-    try:
-        # # get user
-        # clerk_id = request.args.get("user_id")
-        # if not clerk_id:
-        #     return jsonify({"error": "Missing user_id"}), 400
-        # user = get_user_by_clerk_id(db, clerk_id)
-        
-        # # event = db.query(Event).filter_by(id=event_id).first()
-        # event = get_event_by_id(db, event_id)
-        # event_dict = event.as_dict()
-        
-        # org = db.query(Organization).filter_by(id=event.org_id).first()
-        # event_dict["org"] = org.name
-        # event_dict["user_is_admin"] = True if get_admin_by_org_and_user(db, event.org_id, user.id) else False
-
-        # tags = (
-        #     db.query(Tag.id, Tag.name)
-        #     .join(Tag.event_tags) # relationship set up in models
-        #     # .join(EventTag, Tag.id == EventTag.tag_id)  # explicit join condition
-        #     .filter(EventTag.event_id == event_id)      # filter by the event id
-        #     .all()
-        # )
-        tags = get_tags_by_event(db, event_id)
-
-        tag_names = [{"id": t.id, "name": t.name} for t in tags]
-
-        # # check if saved
-        # if user:
-        #     saved = db.query(UserSavedEvent.event_id).filter_by(user_id=user.id, event_id=event_id).first()
-        #     event_dict["user_saved"] = (saved is not None)
-        # else:
-        #     event_dict["user_saved"] = False
-        print("👉🏷🏷🏷🏷 👈 ", tag_names)
-
-        return tag_names
-
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
 @events_bp.route("/", methods=["GET"])
 def get_all_events():
     term = request.args.get("term").lower()
     tag_ids_raw = request.args.get("tags")
     tag_ids = tag_ids_raw.split(",") if tag_ids_raw else []
     date = request.args.get("date")
-    # print("🔗🔗🔗😄 ", request.url)
     db = g.db
     try:
         # get user
@@ -640,7 +477,6 @@ def batch_delete_events_by_params():
 
 @events_bp.route("/<event_id>", methods=["GET"])
 def get_specific_events(event_id):
-    print("🍎🍎🍎🍎", request.url)
     db = g.db
     try:
         # get user
@@ -781,7 +617,7 @@ def update_event(event_id):
         return jsonify({"error": str(e)}), 500
 
 
-@events_bp.route("user_saved_events", methods=["GET"])
+@events_bp.route("/user_saved_events", methods=["GET"])
 def get_all_saved_events():
     db = g.db
     try:
@@ -816,7 +652,7 @@ def get_all_saved_events():
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
-@events_bp.route("user_saved_event_occurrences", methods=["GET"])
+@events_bp.route("/user_saved_event_occurrences", methods=["GET"])
 def get_all_saved_events_occurrences():
     db = g.db
     try:
@@ -920,16 +756,8 @@ def get_event_recurrence(event_id):
     db = g.db
     try:
         rule = get_recurrence_rule_by_event(db, event_id)
-        print("📏", rule)
         if not rule:
-            print("no rule found ig")
             return 
-            # raise HTTPException(status_code=404, detail="No recurrence rule found for this event")
-        #     repeat = "none"
-        # if rule.count is None and rule.until is None:
-        #     repeat = rule.frequency.value.lower()  # "daily", "weekly", etc.
-        # else:
-        #     repeat = "custom"
 
         recurrence_rule_data = {
             "frequency": rule.frequency.value, # converts FrequencyType.DAILY -> "DAILY"
@@ -940,7 +768,6 @@ def get_event_recurrence(event_id):
             "by_month": rule.by_month,
             "by_month_day": rule.by_month_day,
             "by_day": rule.by_day, 
-            # "repeat": repeat,
         }
         print("😵😵😵 FETCHED RECRULE", recurrence_rule_data)
 
@@ -952,6 +779,10 @@ def get_event_recurrence(event_id):
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
+# Tag 
+# User_saved events 
+# Occurence 
+# 
 
 # Switching to event_occurrences
 @events_bp.route("/occurrences", methods=["GET"])
@@ -963,7 +794,6 @@ def get_all_event_occurrences():
     limit = min(int(request.args.get("limit", 50)), 100)
     offset = int(request.args.get("offset", 0))
 
-    # print("🔗🔗🔗😄 ", request.url, " | 👷 ", request.headers)
     db = g.db
     try:
         # get user
