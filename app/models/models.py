@@ -190,7 +190,6 @@ class Category(Base):
     org: Mapped['Organization'] = relationship('Organization', back_populates='categories')
     admins: Mapped[List['Admin']] = relationship('Admin', back_populates='category')
     events: Mapped[List['Event']] = relationship('Event', back_populates='category')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='category')
     event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='category')
     calendar_sources: Mapped[List['CalendarSource']] = relationship('CalendarSource', back_populates='category')
 
@@ -253,7 +252,6 @@ class Schedule(Base):
     name: Mapped[Optional[str]] = mapped_column(Text)
 
     user: Mapped['User'] = relationship('User', back_populates='schedules')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule', cascade="all, delete-orphan")
     schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule', cascade="all, delete-orphan")
     user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule', cascade="all, delete-orphan")
 
@@ -348,22 +346,6 @@ class ScheduleOrg(Base):
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='schedule_orgs')
     schedule: Mapped['Schedule'] = relationship('Schedule', back_populates='schedule_orgs')
-
-
-class ScheduleCategory(Base):
-    __tablename__ = 'schedule_categories'
-    __table_args__ = (
-        ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='schedule_categories_category_id_fkey'),
-        ForeignKeyConstraint(['schedule_id'], ['schedules.id'], ondelete='CASCADE', name='schedule_categories_schedule_id_fkey'),
-        PrimaryKeyConstraint('schedule_id', 'category_id', name='schedule_categories_pkey')
-    )
-
-    schedule_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    category_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-
-    category: Mapped['Category'] = relationship('Category', back_populates='schedule_categories')
-    schedule: Mapped['Schedule'] = relationship('Schedule', back_populates='schedule_categories')
 
 
 class Club(Base):
