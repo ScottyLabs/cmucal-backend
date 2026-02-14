@@ -163,3 +163,66 @@ def get_rrule_from_db_rule(rule, event_tz) -> rrule:
 
     return rrule(**kwargs)
 
+def get_recurrence_rule_by_event(db, event_id:int):
+    """
+    Queries the database for the specific recurrence rule according to event id.
+    """
+    return db.query(RecurrenceRule).filter(RecurrenceRule.event_id == event_id).first()
+
+
+def update_recurrence_rule(db, event_id: int, frequency: FrequencyType,  
+                        interval: int, start_datetime: str, count: int = None, until: str = None, 
+                        by_month: int = None, by_month_day: int = None, by_day: List[str] = None):
+    """
+    Updates a recurrence rule to the database. If count is set, it will respect the count.
+    If count is not set and until is set, it will respect the until date with a 6-month cap, and add orig_until to the database.
+    If both count and until are not set, it will use a 6-month cap from now, and add orig_until to the database.
+
+    when rendering the rule, it will use the count or until date to determine the end of the recurrence (regenerate if count is NULL).
+    """
+    six_months_later = datetime.now(timezone.utc) + timedelta(days=180)
+    orig_until = None
+
+    if isinstance(until, str):
+        until = parse_datetime(until)
+
+    if count is None:
+        orig_until = until
+        if until is None:
+            until = six_months_later
+        else:
+            until = min(until, six_months_later)
+
+    existing_rule = db.query(RecurrenceRule).filter_by(event_id=event_id).first()
+
+    if existing_rule:
+        # Update fields in place
+        existing_rule.frequency = frequency
+        existing_rule.interval = interval
+        existing_rule.start_datetime = start_datetime
+        existing_rule.count = count
+        existing_rule.until = until
+        existing_rule.by_month = by_month
+        existing_rule.by_month_day = by_month_day
+        existing_rule.by_day = by_day
+        existing_rule.orig_until = orig_until
+        db.flush()
+        db.refresh(existing_rule)
+        return existing_rule
+    else:
+        new_rule = RecurrenceRule(
+            frequency=frequency,
+            interval=interval,
+            start_datetime=start_datetime,
+            count=count,
+            until=until,
+            event_id=event_id,  
+            by_month=by_month,
+            by_month_day=by_month_day,
+            by_day=by_day,
+            orig_until=orig_until  # Store the original until date if applicable
+        )
+        db.add(new_rule)
+        db.flush()
+        db.refresh(new_rule)
+        return new_rule
