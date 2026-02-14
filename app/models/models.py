@@ -19,19 +19,6 @@ class AgentRun(Base):
     course_websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='agent_run')
 
 
-class Career(Base):
-    __tablename__ = 'careers'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='careers_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='careers_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    host: Mapped[Optional[str]] = mapped_column(Text)
-    link: Mapped[Optional[str]] = mapped_column(Text)
-    registration_required: Mapped[Optional[bool]] = mapped_column(Boolean)
-
-
 class Organization(Base):
     __tablename__ = 'organizations'
     __table_args__ = (
@@ -334,17 +321,6 @@ class ScheduleOrg(Base):
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='schedule_orgs')
     schedule: Mapped['Schedule'] = relationship('Schedule', back_populates='schedule_orgs')
-
-
-class Club(Base):
-    __tablename__ = 'clubs'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='clubs_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='clubs_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-
 
 class EventOccurrence(Base):
     __tablename__ = 'event_occurrences'

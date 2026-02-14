@@ -2,15 +2,13 @@ from zoneinfo import ZoneInfo
 from flask import Blueprint, jsonify, request, g
 from app.models.user import get_user_by_clerk_id
 from app.models.event import save_event, get_event_by_id
-from app.models.career import save_career
 from app.models.admin import get_admin_by_org_and_user
-from app.models.club import save_club
 from app.models.tag import get_tag_by_name, save_tag, get_all_tags
 from app.models.event_tag import save_event_tag, get_tags_by_event, delete_event_tag
 from app.models.recurrence_rule import add_recurrence_rule
 from app.models.event_occurrence import populate_event_occurrences, regenerate_event_occurrences_by_event_ids, save_event_occurrence
 from app.models.category import category_to_dict, get_category_by_id
-from app.models.models import CalendarSource, Career, Club, Event, RecurrenceRule, UserSavedEvent, Organization, EventOccurrence, EventTag, Category, Tag, RecurrenceExdate, RecurrenceRdate, EventOverride, RecurrenceOverride
+from app.models.models import CalendarSource, Event, RecurrenceRule, UserSavedEvent, Organization, EventOccurrence, EventTag, Category, Tag, RecurrenceExdate, RecurrenceRdate, EventOverride, RecurrenceOverride
 import pprint
 from datetime import datetime, timezone
 from sqlalchemy import cast, Date, or_, delete, select
@@ -90,15 +88,6 @@ def create_event_record():
                     save_event_tag(db, event_id=event.id, tag_id=tag.id)
                 else:
                     return jsonify({"error": f"Failed to save tag '{tag_name}'"}), 500
-        
-        if event_type == "CAREER":
-            career = save_career(db,
-                        event_id=event.id, 
-                        host=data.get("host", None),
-                        link=data.get("link", None),
-                        registration_required=data.get("registration_required", None))
-        elif event_type == "CLUB":
-            club = save_club(db, event_id=event.id)
         
         if recurrence and recurrence != "ONETIME":
             recurrence_data = data.get("recurrence_data", {})
@@ -556,12 +545,6 @@ def batch_delete_events_by_params():
         )
         db.execute(
             delete(UserSavedEvent).where(UserSavedEvent.event_id.in_(event_id_subq))
-        )
-        db.execute(
-            delete(Career).where(Career.event_id.in_(event_id_subq))
-        )
-        db.execute(
-            delete(Club).where(Club.event_id.in_(event_id_subq))
         )
         # --------------------------------------------------
         # 3. Handle recurrence hierarchy
