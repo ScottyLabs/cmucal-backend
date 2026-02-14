@@ -1,5 +1,6 @@
 import datetime as dt
 import re
+from zoneinfo import ZoneInfo
 
 import bs4
 import requests
@@ -7,7 +8,8 @@ import requests
 from scraper.monitors.base_scraper import BaseScraper
 from scraper.models import SupplementalInstruction
 
-
+# Timezone constant for CMU events
+SI_TIMEZONE = ZoneInfo("America/New_York")
 
 
 class SupplementalInstructionScraper(BaseScraper):
@@ -106,11 +108,11 @@ class SupplementalInstructionScraper(BaseScraper):
         
         weekday_code = self._weekday_name_to_code(weekday_name)
 
-        # Create datetime objects with arbitrary date (date component is irrelevant)
-        # TODO: DEAL WITH TIMEZONES
+        # Create timezone-aware datetime objects (date component is arbitrary)
+        # Using America/New_York timezone to ensure correct event times regardless of server timezone
         arbitrary_date = dt.date.today()
-        start_datetime = dt.datetime.combine(arbitrary_date, start_time)
-        end_datetime = dt.datetime.combine(arbitrary_date, end_time)
+        start_datetime = dt.datetime.combine(arbitrary_date, start_time, tzinfo=SI_TIMEZONE)
+        end_datetime = dt.datetime.combine(arbitrary_date, end_time, tzinfo=SI_TIMEZONE)
         
         time_location_data = {
             "recurrence_frequency": "WEEKLY",

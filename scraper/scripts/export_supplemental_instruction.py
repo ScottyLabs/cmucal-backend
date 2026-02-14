@@ -17,7 +17,6 @@ API_BASE_URL = get_api_base_url()
 
 SI_SOURCE_URL = "https://www.cmu.edu/student-success/programs/supp-inst.html"
 SI_SEMESTER = "SI"
-SI_TIMEZONE = ZoneInfo("America/New_York")
 CLEAR_CATEGORIES = True
 
 
@@ -46,11 +45,9 @@ def create_si_event(resource, org: dict, category: dict, time_location: dict, *,
     location = time_location["location"]
     tz = SI_TIMEZONE
 
-    # Parse start and end datetimes, and ensure they are timezone-aware
+    # Parse start and end datetimes (already timezone-aware from scraper)
     start_dt = isoparse(time_location["start_datetime"])
     end_dt = isoparse(time_location["end_datetime"])
-    start_dt = start_dt.astimezone(tz)
-    end_dt = end_dt.astimezone(tz)
 
     
     org_id = org["id"]
