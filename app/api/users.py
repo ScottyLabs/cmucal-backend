@@ -7,7 +7,6 @@ from app.services.google_service import create_cmucal_calendar
 from app.models.organization import create_organization
 from app.models.admin import create_admin, get_categories_for_admin_user, get_role
 from app.models.schedule import create_schedule, delete_schedule
-from app.models.schedule_category import create_schedule_category
 from app.models.schedule_org import create_schedule_org, remove_schedule_org
 from app.models.category import join_org_and_to_dict
 from app.models.models import User
@@ -127,24 +126,6 @@ def delete_schedule_record():
             return jsonify({"status": "schedule deleted", "schedule_id": schedule_id}), 200
         else:
             return jsonify({"error": "Schedule not found"}), 404
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@users_bp.route("/create_schedule_category", methods=["POST"])
-def create_schedule_category_record():
-    db = g.db
-    try:
-        data = request.get_json()
-        schedule_id = data.get("schedule_id")
-        category_id = data.get("category_id")
-        if not schedule_id or not category_id:
-            return jsonify({"error": "Missing schedule_id or category_id"}), 400
-        
-        schedule_category = create_schedule_category(db, schedule_id=schedule_id, category_id=category_id)
-        db.commit()
-        return jsonify({"status": "schedule created", "schedule_id": schedule_id, "category_id": category_id}), 201
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())

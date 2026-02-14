@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from sqlalchemy.orm import joinedload, subqueryload
-from app.models.models import User, Schedule, ScheduleCategory, Category, Organization, EventOccurrence, Academic, Event
+from app.models.models import User, Schedule, Category, Organization, EventOccurrence, Event
 from app.utils.auth import get_current_user
 
 schedule_bp = Blueprint('schedule_bp', __name__)
@@ -127,32 +127,4 @@ def get_schedule_route():
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@schedule_bp.route('/category/<int:category_id>', methods=['DELETE'])
-def remove_category_from_schedule(category_id):
-    clerk_user_id = request.headers.get('Clerk-User-Id')
-    user = get_current_user(clerk_user_id)
-
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    
-    db = g.db
-    try:
-        schedule = db.query(Schedule).filter(Schedule.user_id == user.id).first()
-        if not schedule:
-            return jsonify({"error": "Schedule not found"}), 404
-
-        schedule_category_to_delete = db.query(ScheduleCategory).filter(
-            ScheduleCategory.schedule_id == schedule.id,
-            ScheduleCategory.category_id == category_id
-        ).first()
-
-        if not schedule_category_to_delete:
-            return jsonify({"error": "Category not found in schedule"}), 404
-
-        db.delete(schedule_category_to_delete)
-        db.commit()
-        return jsonify({"message": "Category removed successfully"}), 200
-    except Exception as e:
         return jsonify({"error": str(e)}), 500

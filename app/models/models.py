@@ -7,18 +7,6 @@ import datetime
 from app.services.db import Base
 from app.models.enums import FrequencyType, RecurrenceType
 
-class CrosslistGroup(Base):
-    __tablename__ = 'crosslist_groups'
-    # __table_args__ = (
-    #     PrimaryKeyConstraint('id', name='crosslist_groups_pkey'),
-    # )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
-    name: Mapped[str] = mapped_column(Text)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-
-    course_crosslist: Mapped[List['CourseCrosslist']] = relationship('CourseCrosslist', back_populates='group')
-
 class AgentRun(Base):
     __tablename__ = 'agent_runs'
 
@@ -29,31 +17,6 @@ class AgentRun(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     course_websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='agent_run')
-
-class Academic(Base):
-    __tablename__ = 'academics'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='academics_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='academics_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    course_num: Mapped[Optional[str]] = mapped_column(Text)
-    course_name: Mapped[Optional[str]] = mapped_column(Text)
-    instructors: Mapped[Optional[list]] = mapped_column(ARRAY(Text()))
-
-
-class Career(Base):
-    __tablename__ = 'careers'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='careers_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='careers_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    host: Mapped[Optional[str]] = mapped_column(Text)
-    link: Mapped[Optional[str]] = mapped_column(Text)
-    registration_required: Mapped[Optional[bool]] = mapped_column(Boolean)
 
 
 class Organization(Base):
@@ -94,7 +57,6 @@ class Course(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='courses')
-    course_crosslist: Mapped[List['CourseCrosslist']] = relationship('CourseCrosslist', back_populates='course')
     websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='course', cascade='all, delete-orphan')
 
 
@@ -133,23 +95,6 @@ class CourseWebsite(Base):
 
     course: Mapped['Course'] = relationship('Course',back_populates='websites')
     agent_run: Mapped['AgentRun'] = relationship('AgentRun',back_populates='course_websites')
-
-class CourseCrosslist(Base):
-    __tablename__ = 'course_crosslist'
-    __table_args__ = (
-        ForeignKeyConstraint(['course_id'], ['courses.id'], ondelete='CASCADE', name='course_crosslist_course_id_fkey'),
-        ForeignKeyConstraint(['group_id'], ['crosslist_groups.id'], ondelete='CASCADE', name='course_crosslist_group_id_fkey'),
-        # PrimaryKeyConstraint('id', name='course_crosslist_pkey')
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    course_id: Mapped[int] = mapped_column(BigInteger)
-    group_id: Mapped[int] = mapped_column(BigInteger)
-
-    course: Mapped['Course'] = relationship('Course', back_populates='course_crosslist')
-    group: Mapped['CrosslistGroup'] = relationship('CrosslistGroup', back_populates='course_crosslist')
-
 
 class Tag(Base):
     __tablename__ = 'tags'
@@ -220,7 +165,6 @@ class Category(Base):
     org: Mapped['Organization'] = relationship('Organization', back_populates='categories')
     admins: Mapped[List['Admin']] = relationship('Admin', back_populates='category')
     events: Mapped[List['Event']] = relationship('Event', back_populates='category')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='category')
     event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='category')
     calendar_sources: Mapped[List['CalendarSource']] = relationship('CalendarSource', back_populates='category')
 
@@ -283,7 +227,6 @@ class Schedule(Base):
     name: Mapped[Optional[str]] = mapped_column(Text)
 
     user: Mapped['User'] = relationship('User', back_populates='schedules')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule', cascade="all, delete-orphan")
     schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule', cascade="all, delete-orphan")
     user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule', cascade="all, delete-orphan")
 
@@ -378,33 +321,6 @@ class ScheduleOrg(Base):
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='schedule_orgs')
     schedule: Mapped['Schedule'] = relationship('Schedule', back_populates='schedule_orgs')
-
-
-class ScheduleCategory(Base):
-    __tablename__ = 'schedule_categories'
-    __table_args__ = (
-        ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='schedule_categories_category_id_fkey'),
-        ForeignKeyConstraint(['schedule_id'], ['schedules.id'], ondelete='CASCADE', name='schedule_categories_schedule_id_fkey'),
-        PrimaryKeyConstraint('schedule_id', 'category_id', name='schedule_categories_pkey')
-    )
-
-    schedule_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    category_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-
-    category: Mapped['Category'] = relationship('Category', back_populates='schedule_categories')
-    schedule: Mapped['Schedule'] = relationship('Schedule', back_populates='schedule_categories')
-
-
-class Club(Base):
-    __tablename__ = 'clubs'
-    __table_args__ = (
-        ForeignKeyConstraint(['event_id'], ['events.id'], ondelete='CASCADE', name='clubs_event_id_fkey'),
-        PrimaryKeyConstraint('event_id', name='clubs_pkey')
-    )
-
-    event_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
-
 
 class EventOccurrence(Base):
     __tablename__ = 'event_occurrences'
