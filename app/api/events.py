@@ -876,15 +876,15 @@ def get_events_by_organization(org_id: int):
 
     def event_to_dict(ev):
         return {
-            "id": getattr(ev, "id", None),
-            "title": getattr(ev, "title", None),
-            "description": getattr(ev, "description", None),
-            "start_datetime": getattr(ev, "start_datetime", None).isoformat() if getattr(ev, "start_datetime", None) else None,
-            "end_datetime": getattr(ev, "end_datetime", None).isoformat() if getattr(ev, "end_datetime", None) else None,
-            "all_day": getattr(ev, "all_day", None),
-            "calendar_source_id": getattr(ev, "calendar_source_id", None),
-            "created_at": getattr(ev, "created_at", None).isoformat() if getattr(ev, "created_at", None) else None,
-            "updated_at": getattr(ev, "updated_at", None).isoformat() if getattr(ev, "updated_at", None) else None,
+            "id": ev.id,
+            "title": ev.title,
+            "description": ev.description,
+            "start_datetime": ev.start_datetime.isoformat() if ev.start_datetime else None,
+            "end_datetime": ev.end_datetime.isoformat() if ev.end_datetime else None,
+            "all_day": ev.all_day,
+            "calendar_source_id": ev.calendar_source_id,
+            "created_at": ev.created_at.isoformat() if ev.created_at else None,
+            "updated_at": ev.updated_at.isoformat() if ev.updated_at else None,
         }
 
     return jsonify({"events": [event_to_dict(e) for e in events]}), 200
