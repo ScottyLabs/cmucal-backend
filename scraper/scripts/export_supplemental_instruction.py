@@ -17,6 +17,7 @@ API_BASE_URL = get_api_base_url()
 
 SI_SOURCE_URL = "https://www.cmu.edu/student-success/programs/supp-inst.html"
 SI_SEMESTER = "SI"
+SI_TIMEZONE = ZoneInfo("America/New_York")
 CLEAR_CATEGORIES = True
 
 
