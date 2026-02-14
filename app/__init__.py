@@ -52,7 +52,6 @@ def create_app():
         from app.api.events import events_bp
         from app.api.schedule import schedule_bp
         from app.api.admin import admin_bp
-        from app.cli import import_courses_command
 
         origins = [o.strip() for o in os.getenv(
             "CORS_ALLOWED_ORIGINS",
@@ -74,8 +73,5 @@ def create_app():
         app.register_blueprint(schedule_bp, url_prefix="/api/schedule")
         app.register_blueprint(admin_bp, url_prefix="/api/admin")
         app.register_blueprint(base_bp)
-        
-        # Register CLI command
-        app.cli.add_command(import_courses_command)
 
     return app
