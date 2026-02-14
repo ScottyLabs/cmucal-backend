@@ -82,7 +82,6 @@ class Course(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     org: Mapped['Organization'] = relationship('Organization', back_populates='courses')
-    course_crosslist: Mapped[List['CourseCrosslist']] = relationship('CourseCrosslist', back_populates='course')
     websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='course', cascade='all, delete-orphan')
 
 
@@ -121,21 +120,6 @@ class CourseWebsite(Base):
 
     course: Mapped['Course'] = relationship('Course',back_populates='websites')
     agent_run: Mapped['AgentRun'] = relationship('AgentRun',back_populates='course_websites')
-
-class CourseCrosslist(Base):
-    __tablename__ = 'course_crosslist'
-    __table_args__ = (
-        ForeignKeyConstraint(['course_id'], ['courses.id'], ondelete='CASCADE', name='course_crosslist_course_id_fkey'),
-        # PrimaryKeyConstraint('id', name='course_crosslist_pkey')
-    )
-
-    id: Mapped[int] = mapped_column(BigInteger, Identity(start=1, increment=1, minvalue=1, maxvalue=9223372036854775807, cycle=False, cache=1), primary_key=True)
-    created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
-    course_id: Mapped[int] = mapped_column(BigInteger)
-    group_id: Mapped[int] = mapped_column(BigInteger)
-
-    course: Mapped['Course'] = relationship('Course', back_populates='course_crosslist')
-
 
 class Tag(Base):
     __tablename__ = 'tags'
