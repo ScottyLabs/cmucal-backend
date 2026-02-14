@@ -563,7 +563,7 @@ def toggle_calendar_source_active(org_id: int, cs_id: int):
     # Toggle active flag
     calendar_source.active = not bool(calendar_source.active)
     calendar_source.updated_at = datetime.now(timezone.utc)
-    db.flush()
+    db.commit()
 
     return (
         jsonify(
@@ -584,7 +584,6 @@ def delete_organization(org_id: int):
     if not org:
         return jsonify({"error": "Organization not found"}), 404
 
-    # Delete (caller transaction controls commit)
     db.delete(org)
-    db.flush()
+    db.commit()
     return "", 204
