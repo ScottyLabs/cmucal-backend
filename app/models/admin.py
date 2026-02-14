@@ -88,6 +88,36 @@ def delete_admin(db, org_id: int, user_id: int):
         return True
     return False
 
+def update_admin(db, org_id: int, user_id: int, role: str = None, category_id: int = None):
+    """
+    Update an admin's role and/or category_id.
+
+    Args:
+        db: Database session.
+        org_id: ID of the organization.
+        user_id: ID of the user.
+        role: New role to assign (optional).
+        category_id: New category ID to assign (optional).
+
+    Returns:
+        The updated Admin object, or None if not found.
+    """
+    admin = db.query(Admin).filter(
+        Admin.org_id == org_id,
+        Admin.user_id == user_id
+    ).first()
+
+    if not admin:
+        return None
+
+    if role is not None:
+        admin.role = role
+    if category_id is not None:
+        admin.category_id = category_id
+
+    db.add(admin)
+    return admin
+
 def get_admins_by_org(db, org_id: int) -> List[Admin]:
     """
     Retrieve all admins for a specific organization.

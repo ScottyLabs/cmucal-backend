@@ -1,12 +1,14 @@
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, jsonify, request, g, abort
 from app.models.user import get_user_by_clerk_id, get_user_by_email, create_user_without_clerk, get_user_by_id
 from app.models.organization import create_organization, get_orgs_by_type, get_organization_by_name, get_organization_by_id
-from app.models.models import Organization, Category, Event, EventOccurrence
-from app.models.admin import create_admin, delete_admin, get_admin_by_org_and_user, get_admins_by_org
+from app.models.models import Organization, Category, Event, EventOccurrence, CalendarSource
+from app.models.admin import create_admin, delete_admin, update_admin, get_admin_by_org_and_user, get_admins_by_org
 from app.models.category import create_category, get_categories_by_org_id
+from app.models.calendar_source import deactivate_calendar_source
 from app.services.ical import delete_events_for_calendar_source
 from app.utils.course_data import get_course_data
 from app.utils.auth import get_current_user
+from datetime import timezone, datetime
 
 
 orgs_bp = Blueprint("orgs", __name__)
@@ -314,6 +316,33 @@ def create_admin_record():
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
+@orgs_bp.route("/update_admin", methods=["PATCH"])
+def update_admin_record():
+    """Update an admin's role and/or category assignment."""
+    db = g.db
+    try:
+        data = request.get_json()
+        user_id = data.get("user_id")
+        if not user_id:
+            return jsonify({"error": "Missing user_id"}), 400
+        org_id = data.get("org_id")
+        if not org_id:
+            return jsonify({"error": "Missing org_id"}), 400
+
+        role = data.get("role", None)
+        category_id = data.get("category_id", None)
+
+        admin = update_admin(db, org_id=org_id, user_id=user_id, role=role, category_id=category_id)
+        if not admin:
+            return jsonify({"error": "Admin not found"}), 404
+
+        db.commit()
+        return jsonify({"status": "admin updated", "user": admin.user_id, "org": admin.org_id, "role": admin.role, "category_id": admin.category_id}), 200
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 @orgs_bp.route("/delete_admin", methods=["DELETE"])
 def delete_admin_record():
     db = g.db
@@ -494,3 +523,68 @@ def get_user_role_in_org():
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
+@orgs_bp.route("/<int:org_id>/calendar_sources", methods=["GET"])
+def list_calendar_sources(org_id: int):
+    db = g.db
+    calendar_sources = (
+        db.query(CalendarSource).filter(CalendarSource.org_id == org_id).all()
+    )
+
+    def cs_to_dict(cs):
+        return {
+            "id": getattr(cs, "id", None),
+            "url": getattr(cs, "url", None),
+            "active": getattr(cs, "active", None),
+            "category_id": getattr(cs, "category_id", None),
+            "notes": getattr(cs, "notes", None),
+            "default_event_type": getattr(cs, "default_event_type", None),
+            "created_by_user_id": getattr(cs, "created_by_user_id", None),
+            "created_at": getattr(cs, "created_at", None).isoformat() if getattr(cs, "created_at", None) else None,
+            "updated_at": getattr(cs, "updated_at", None).isoformat() if getattr(cs, "updated_at", None) else None,
+        }
+
+    return jsonify({"calendar_sources": [cs_to_dict(cs) for cs in calendar_sources]}), 200
+
+
+@orgs_bp.route("/<int:org_id>/calendar_sources/<int:cs_id>", methods=["PATCH"])
+def toggle_calendar_source_active(org_id: int, cs_id: int):
+    db = g.db
+    # Acquire row lock to avoid races
+    calendar_source = (
+        db.query(CalendarSource)
+        .filter(CalendarSource.id == cs_id, CalendarSource.org_id == org_id)
+        .with_for_update()
+        .one_or_none()
+    )
+
+    if not calendar_source:
+        return jsonify({"error": "CalendarSource not found"}), 404
+
+    # Toggle active flag
+    calendar_source.active = not bool(calendar_source.active)
+    calendar_source.updated_at = datetime.now(timezone.utc)
+    db.flush()
+
+    return (
+        jsonify(
+            {
+                "id": calendar_source.id,
+                "active": calendar_source.active,
+                "updated_at": calendar_source.updated_at.isoformat(),
+            }
+        ),
+        200,
+    )
+
+
+@orgs_bp.route("/<int:org_id>", methods=["DELETE"])
+def delete_organization(org_id: int):
+    db = g.db
+    org = db.query(Organization).filter(Organization.id == org_id).one_or_none()
+    if not org:
+        return jsonify({"error": "Organization not found"}), 404
+
+    # Delete (caller transaction controls commit)
+    db.delete(org)
+    db.flush()
+    return "", 204

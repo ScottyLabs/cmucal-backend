@@ -861,3 +861,30 @@ def get_event_category(category_id):
         import traceback
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+
+@events_bp.route("/by_org/<int:org_id>", methods=["GET"])
+def get_events_by_organization(org_id: int):
+    db = g.db
+    # join Event -> CalendarSource to filter by CalendarSource.org_id
+    events = (
+        db.query(Event)
+        .join(CalendarSource, Event.calendar_source_id == CalendarSource.id)
+        .filter(CalendarSource.org_id == org_id)
+        .options(joinedload(Event.calendar_source))
+        .all()
+    )
+
+    def event_to_dict(ev):
+        return {
+            "id": getattr(ev, "id", None),
+            "title": getattr(ev, "title", None),
+            "description": getattr(ev, "description", None),
+            "start_datetime": getattr(ev, "start_datetime", None).isoformat() if getattr(ev, "start_datetime", None) else None,
+            "end_datetime": getattr(ev, "end_datetime", None).isoformat() if getattr(ev, "end_datetime", None) else None,
+            "all_day": getattr(ev, "all_day", None),
+            "calendar_source_id": getattr(ev, "calendar_source_id", None),
+            "created_at": getattr(ev, "created_at", None).isoformat() if getattr(ev, "created_at", None) else None,
+            "updated_at": getattr(ev, "updated_at", None).isoformat() if getattr(ev, "updated_at", None) else None,
+        }
+
+    return jsonify({"events": [event_to_dict(e) for e in events]}), 200
