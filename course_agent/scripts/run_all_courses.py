@@ -14,7 +14,7 @@ def main():
     courses = fake_courses
 
     # Create a new agent run record, should increment agent_version if needed
-    agent_version = "v1.0"
+    agent_version = "course_agent_v1"
     agent_run_id = insert_agent_run(agent_version=agent_version)
 
     agent = build_course_agent()
