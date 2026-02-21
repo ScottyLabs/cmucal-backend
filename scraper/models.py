@@ -193,3 +193,35 @@ class SupplementalInstruction:
         self.professors = professors
         self.si_leaders = si_leaders
         self.time_locations = time_locations
+
+
+class PeerTutoring:
+    """
+    Peer Tutoring session from CMU SASC (one per course).
+    
+    Example (shown as json):
+    {
+        "course_num": "15110",
+        "course_name": "Principles of Computing",
+        "tutors": ["Adi"],
+        "time_location": {
+            "recurrence_frequency": "WEEKLY",
+            "recurrence_interval": 1,
+            "recurrence_by_day": "TH",
+            "start_datetime": "2026-01-04T19:30:00-05:00",
+            "end_datetime": "2026-01-04T21:30:00-05:00",
+            "location": "Highmark Tartan Room"
+        }
+    }
+    """
+    def __init__(
+        self,
+        course_num: str,
+        course_name: str,
+        tutors: list[str],
+        time_location: dict,
+    ):
+        self.course_num = course_num
+        self.course_name = course_name
+        self.tutors = tutors
+        self.time_location = time_location
