@@ -17,6 +17,7 @@ class AgentRun(Base):
     created_at: Mapped[datetime.datetime] = mapped_column(DateTime(True), server_default=text('now()'))
 
     course_websites: Mapped[list['CourseWebsite']] = relationship('CourseWebsite', back_populates='agent_run')
+    events: Mapped[list['Event']] = relationship('Event', back_populates='agent_run')
 
 
 class Organization(Base):
@@ -256,6 +257,7 @@ class Event(Base):
         ForeignKeyConstraint(['calendar_source_id'], ['calendar_sources.id'], ondelete='SET NULL', name='events_calendar_source_id_fkey'),
         ForeignKeyConstraint(['category_id'], ['categories.id'], ondelete='CASCADE', name='events_category_id_fkey'),
         ForeignKeyConstraint(['org_id'], ['organizations.id'], ondelete='CASCADE', name='events_org_id_fkey'),
+        ForeignKeyConstraint(['agent_run_id'], ['agent_runs.id'], ondelete='CASCADE', name='events_agent_run_id_fkey',),
          # Dedupe SOC events only
         UniqueConstraint(
             "org_id",
@@ -284,6 +286,7 @@ class Event(Base):
     org_id: Mapped[int] = mapped_column(BigInteger)
     category_id: Mapped[int] = mapped_column(BigInteger)
     calendar_source_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
+    agent_run_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
 
     description: Mapped[Optional[str]] = mapped_column(Text)
     source_url: Mapped[Optional[str]] = mapped_column(Text)

@@ -7,6 +7,7 @@ API_BASE_URL = get_api_base_url()
 
 from scraper.monitors.academic import ScheduleOfClassesScraper
 from scraper.persistence.supabase_categories import ensure_lecture_category
+from scraper.persistence.supabase_agent_run import insert_agent_run
 from scraper.transforms.soc_org_course import build_orgs_and_courses
 from scraper.persistence.supabase_writer import get_supabase
 from scraper.persistence.supabase_org_course import upsert_orgs, upsert_courses
@@ -38,6 +39,10 @@ def export_soc():
     scraper = ScheduleOfClassesScraper(db, semester_label="Spring_26")
     resources = scraper.scrape_data_only()
 
+    # agent run
+    agent_run_id = insert_agent_run(db, agent_version="soc_v1")
+    logger.info(f"Created agent run with ID {agent_run_id}")
+
     # orgs + courses
     orgs, courses = build_orgs_and_courses(resources)
     org_id_by_key = upsert_orgs(db, orgs)
@@ -51,7 +56,7 @@ def export_soc():
     print(f"✅ {len(category_id_by_org)} categories")
 
     # events + recurrence rules
-    events, rrules = build_events_and_rrules(resources, org_id_by_key, category_id_by_org)
+    events, rrules = build_events_and_rrules(resources, org_id_by_key, category_id_by_org, agent_run_id)
     event_id_by_identity = insert_events(db, events)
     replace_recurrence_rules(db, rrules, event_id_by_identity)
     print(f"✅ {len(events)} events and {len(rrules)} recurrence rules")
