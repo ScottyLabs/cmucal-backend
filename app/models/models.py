@@ -301,6 +301,7 @@ class Event(Base):
     calendar_source: Mapped[Optional['CalendarSource']] = relationship('CalendarSource', back_populates='events')
     category: Mapped['Category'] = relationship('Category', back_populates='events')
     org: Mapped['Organization'] = relationship('Organization', back_populates='events')
+    agent_run: Mapped[Optional['AgentRun']] = relationship('AgentRun', back_populates='events')
     event_occurrences: Mapped[List['EventOccurrence']] = relationship('EventOccurrence', back_populates='event', passive_deletes=True)
     event_tags: Mapped[List['EventTag']] = relationship('EventTag', back_populates='event', passive_deletes=True)
     recurrence_rules: Mapped[List['RecurrenceRule']] = relationship('RecurrenceRule', back_populates='event', passive_deletes=True)
