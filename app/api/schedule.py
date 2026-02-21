@@ -123,7 +123,7 @@ def get_schedule_route():
                         event_occurrence_to_dict(o) for o in occurrences
                     ]
 
-        return jsonify({"courses": list(courses.values()), "clubs": list(clubs.values())})
+        return jsonify({"courses": list(courses.values()), "clubs": list(clubs.values()), "schedule_id": schedule.id})
     except Exception as e:
         import traceback
         print("Exception:", traceback.format_exc())

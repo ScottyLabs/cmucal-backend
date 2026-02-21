@@ -283,9 +283,9 @@ class Schedule(Base):
     name: Mapped[Optional[str]] = mapped_column(Text)
 
     user: Mapped['User'] = relationship('User', back_populates='schedules')
-    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule')
-    schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule')
-    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule')
+    schedule_categories: Mapped[List['ScheduleCategory']] = relationship('ScheduleCategory', back_populates='schedule', cascade="all, delete-orphan")
+    schedule_orgs: Mapped[List['ScheduleOrg']] = relationship('ScheduleOrg', back_populates='schedule', cascade="all, delete-orphan")
+    user_saved_events: Mapped[List['UserSavedEvent']] = relationship('UserSavedEvent', back_populates='schedule', cascade="all, delete-orphan")
 
 
 class SyncedEvent(Base):

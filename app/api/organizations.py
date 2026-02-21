@@ -1,15 +1,88 @@
 from flask import Blueprint, jsonify, request, g
 from app.models.user import get_user_by_clerk_id, get_user_by_email, create_user_without_clerk, get_user_by_id
 from app.models.organization import create_organization, get_orgs_by_type, get_organization_by_name, get_organization_by_id
-from app.models.models import Organization
+from app.models.models import Organization, Category, Event, EventOccurrence
 from app.models.admin import create_admin, get_admin_by_org_and_user, get_admins_by_org
 from app.models.category import create_category, get_categories_by_org_id
 from app.services.ical import delete_events_for_calendar_source
 from app.utils.course_data import get_course_data
-
+from app.utils.auth import get_current_user
 
 
 orgs_bp = Blueprint("orgs", __name__)
+
+def event_occurrence_to_dict(occurrence: EventOccurrence):
+    """Manually serialize EventOccurrence SQLAlchemy object to a dictionary."""
+    return {
+        "id": occurrence.id,
+        "title": occurrence.title,
+        "description": occurrence.description,
+        "start_datetime": occurrence.start_datetime.isoformat(),
+        "end_datetime": occurrence.end_datetime.isoformat(),
+        "location": occurrence.location,
+        "is_all_day": occurrence.is_all_day,
+        "source_url": occurrence.source_url,
+        "recurrence": occurrence.recurrence.name if occurrence.recurrence else None,
+        "event_id": occurrence.event_id,
+        "org_id": occurrence.org_id,
+        "category_id": occurrence.category_id,
+    }
+
+@orgs_bp.route("/org/<int:org_id>", methods=['GET'])
+def get_organization_data(org_id):
+    """returns a single organization's data with its categories and event occurrences"""
+    clerk_user_id = request.headers.get('Clerk-User-Id')
+    user = get_current_user(clerk_user_id)
+
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+
+    db = g.db
+    try:
+        org = db.query(Organization).filter(Organization.id == org_id).first()
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        org_data = {
+            "org_id": org.id,
+            "name": org.name,
+            "type": org.type,
+            "categories": [],
+            "events": {}
+        }
+
+        # Get all categories for this org
+        categories = db.query(Category).filter(Category.org_id == org.id).all()
+        
+        # Add categories and their events
+        for category in categories:
+            org_data["categories"].append({
+                "id": category.id,
+                "name": category.name
+            })
+            
+            # Get events for this category
+            events = db.query(Event).filter(
+                Event.org_id == org.id,
+                Event.category_id == category.id
+            ).all()
+            
+            # Get event occurrences
+            event_ids = [e.id for e in events]
+            occurrences = []
+            if event_ids:
+                occurrences = db.query(EventOccurrence).filter(
+                    EventOccurrence.event_id.in_(event_ids)
+                ).all()
+            
+            org_data["events"][category.name] = [event_occurrence_to_dict(o) for o in occurrences]
+            
+        return jsonify(org_data)
+
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_all_orgs", methods=["GET"])
 def get_all_orgs():
