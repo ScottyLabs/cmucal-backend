@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, g, abort
+from flask import Blueprint, jsonify, request, g
 from app.models.user import get_user_by_clerk_id, get_user_by_email, create_user_without_clerk, get_user_by_id
 from app.models.organization import create_organization, get_orgs_by_type, get_organization_by_name, get_organization_by_id
 from app.models.models import Organization, Category, Event, EventOccurrence, CalendarSource
