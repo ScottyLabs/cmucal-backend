@@ -30,7 +30,7 @@ def get_user_id():
         return jsonify({"user_id": user.id}), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -88,7 +88,7 @@ def handle_login():
         return jsonify({"status": "exists", "user": user_to_dict(user)}), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/create_schedule", methods=["POST"])
@@ -106,7 +106,7 @@ def create_schedule_record():
         return jsonify({"status": "schedule created", "user_id": user_id, "schedule_id": schedule.id}), 201
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/create_schedule_category", methods=["POST"])
@@ -124,7 +124,7 @@ def create_schedule_category_record():
         return jsonify({"status": "schedule created", "schedule_id": schedule_id, "category_id": category_id}), 201
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/add_org_to_schedule", methods=["POST"])
@@ -142,7 +142,7 @@ def add_org_to_schedule():
         return jsonify({"status": "organization added to schedule", "schedule_id": schedule_id, "org_id": org_id}), 201
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/remove_org_from_schedule", methods=["POST"])
@@ -163,7 +163,7 @@ def remove_org_from_schedule():
             return jsonify({"error": "Organization not found in schedule"}), 404
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
         
 
@@ -193,7 +193,7 @@ def get_user_schedules():
 
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/get_admin_categories", methods=["GET"])
@@ -218,7 +218,7 @@ def get_admin_categories():
 
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @users_bp.route("/get_role", methods=["GET"])
@@ -242,5 +242,5 @@ def get_user_role():
         }), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500

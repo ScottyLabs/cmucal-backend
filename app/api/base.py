@@ -75,7 +75,7 @@ def test_rrule():
 
         rule = rrule(freq=DAILY, dtstart=start, until=until)
 
-        print(list(rule))  # ✅ prints 6 daily dates
+        print(list(rule))  # prints 6 daily dates
 
         # for dt in rrule:
         #     print(dt.date())

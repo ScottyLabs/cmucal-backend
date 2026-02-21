@@ -1,4 +1,4 @@
-from zoneinfo import ZoneInfo
+import traceback
 from flask import Blueprint, jsonify, request, g
 from app.models.user import get_user_by_clerk_id
 from app.models.event import save_event, get_event_by_id
@@ -12,17 +12,14 @@ from app.models.recurrence_rule import add_recurrence_rule, get_recurrence_rule_
 from app.models.event_occurrence import populate_event_occurrences, save_event_occurrence, update_event_occurrence, as_dict, regenerate_event_occurrences_by_event_ids
 from app.models.category import category_to_dict, get_category_by_id
 from app.models.models import Academic, CalendarSource, Career, Club, Event, RecurrenceRule, UserSavedEvent, Organization, EventOccurrence, EventTag, Category, Tag, RecurrenceExdate, RecurrenceRdate, EventOverride, RecurrenceOverride
-import pprint
 from datetime import datetime, timezone
 from sqlalchemy import cast, Date, or_, delete, select
-
 from app.services.ical import delete_events_for_calendar_source, import_ical_feed_using_helpers
 from app.errors.ical import ICalFetchError
 from app.models.calendar_source import create_calendar_source
 
 from app.models.google_event import get_event_id_by_google_event_id
 from app.utils.date import _parse_iso_aware
-
 events_bp = Blueprint("events", __name__)
 
 @events_bp.route("/create_event/form", methods=["POST"])
@@ -155,8 +152,7 @@ def create_event_form():
         db.commit()  # Only commit if all succeeded
         return jsonify({"status": "event created", "event_id": event.id}), 201
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
 
         return jsonify({"error": str(e)}), 500
 
@@ -165,6 +161,9 @@ def create_event_form():
 def create_event_gcal():
     db = g.db
     try:
+        if not request.is_json:
+            return jsonify({"error": "Invalid JSON body"}), 400
+
         data = request.get_json()
         gcal_link = data.get("gcal_link")
         event_type = data.get("event_type", None)
@@ -245,8 +244,7 @@ def create_event_gcal():
 
     # Unexpected errors
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
 
         return jsonify({
             "success": False,
@@ -279,8 +277,7 @@ def regenerate_occurrences_by_events():
             }), 201
 
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -344,8 +341,7 @@ def get_all_events():
         ]
 
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @events_bp.route("/batch_delete_events_by_params", methods=["DELETE"])
@@ -471,8 +467,7 @@ def batch_delete_events_by_params():
         }), 200
 
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @events_bp.route("/<event_id>", methods=["GET"])
@@ -503,8 +498,7 @@ def get_specific_events(event_id):
         return jsonify(event_dict)
 
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @events_bp.route("/<event_id>", methods=["PATCH", "PUT"])
@@ -612,129 +606,9 @@ def update_event(event_id):
         return jsonify(event_dict), 200
 
     except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
-
-@events_bp.route("/user_saved_events", methods=["GET"])
-def get_all_saved_events():
-    db = g.db
-    try:
-        # get user
-        print("🔗Request URL: ", request.url)
-        clerk_id = request.args.get("user_id")
-        # print("😮 [clerk_id] ", clerk_id)
-        if not clerk_id:
-            return jsonify({"error": "Missing user_id"}), 400
-        user = get_user_by_clerk_id(db, clerk_id)
-        # print("😀 [user] ", user)
-
-        # only columns required for calendar view
-        events = db.query(Event.id, Event.title, Event.start_datetime, Event.end_datetime)\
-            .join(UserSavedEvent).filter(
-                UserSavedEvent.user_id == user.id
-            ).all()
-
-        return jsonify([e[0] for e in events]) 
-        # [
-        #     {
-        #         "id": e[0],
-        #         # "title": e[1],
-        #         # "start": e[2].isoformat(),
-        #         # "end": e[3].isoformat(),
-        #     }
-        #     for e in events
-        # ]
-
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@events_bp.route("/user_saved_event_occurrences", methods=["GET"])
-def get_all_saved_events_occurrences():
-    db = g.db
-    try:
-        # get user
-        clerk_id = request.args.get("user_id")
-        if not clerk_id:
-            return jsonify({"error": "Missing user_id"}), 400
-        user = get_user_by_clerk_id(db, clerk_id)
-
-        event_occurrences = (db.query(EventOccurrence.id, EventOccurrence.title, 
-        EventOccurrence.start_datetime, EventOccurrence.end_datetime, Event.id)
-            .join(Event, EventOccurrence.event_id == Event.id)
-            .join(UserSavedEvent, UserSavedEvent.event_id == Event.id)
-            .filter(
-                UserSavedEvent.user_id == user.id
-            ).all())
-
-        return [
-            {
-                "id": e[0],
-                "title": e[1],
-                "start": e[2].isoformat(),
-                "end": e[3].isoformat(),
-                "event_id": e[4]
-            }
-            for e in event_occurrences
-        ]
-
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@events_bp.route("/user_saved_events", methods=["POST"])
-def user_save_event():
-    db = g.db
-    try:
-        data = request.get_json()
-        # get user
-        clerk_id = data.get("user_id")
-        if not clerk_id:
-            return jsonify({"error": "Missing user_id"}), 400
-        user = get_user_by_clerk_id(db, clerk_id)
-
-        new_entry = UserSavedEvent(
-            user_id = user.id,
-            event_id = data["event_id"],
-            google_event_id = data["google_event_id"],
-            saved_at = datetime.now(timezone.utc),
-        )
-        db.add(new_entry)
-        db.commit()
-        return jsonify({"message": "Event added to user's saved events."}), 200
-        
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
-
-@events_bp.route("/user_saved_events/<event_id>", methods=["DELETE"])
-def user_unsave_event(event_id):
-    db = g.db
-    try:
-        data = request.get_json()
-        # get user
-        clerk_id = data.get("user_id")
-        if not clerk_id:
-            return jsonify({"error": "Missing user_id"}), 400
-        user = get_user_by_clerk_id(db, clerk_id)
-
-        user_id = user.id
-        entry = db.query(UserSavedEvent).filter_by(user_id=user_id, event_id=event_id).first()
-
-        if entry:
-            db.delete(entry)
-            db.commit()
-        return jsonify({"message": "Event removed from user's saved events."}), 200 
-            
-    except Exception as e:
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
-        return jsonify({"error": str(e)}), 500
 
 @events_bp.route("/<category_id>/category", methods=["GET"])
 def get_event_category(category_id):
@@ -747,8 +621,7 @@ def get_event_category(category_id):
     
     except Exception as e:
         db.rollback()
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @events_bp.route("<event_id>/recurrence", methods=["GET"])
@@ -775,8 +648,7 @@ def get_event_recurrence(event_id):
 
     except Exception as e:
         db.rollback()
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 # Tag 
@@ -861,8 +733,7 @@ def get_all_event_occurrences():
 
     except Exception as e:
         db.rollback()
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -897,8 +768,7 @@ def get_specific_event_occurrence(event_occurrence_id):
 
     except Exception as e:
         db.rollback()
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -937,6 +807,5 @@ def get_occurrence_from_gcal():
 
     except Exception as e:
         db.rollback()
-        import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500

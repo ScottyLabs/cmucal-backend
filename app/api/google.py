@@ -64,7 +64,7 @@ def ensure_calendar():
     try:
         clerk_id = request.headers.get('Clerk-User-Id')
         if not clerk_id:
-            print("❌ Missing Clerk-User-Id header")
+            print("Missing Clerk-User-Id header")
             return jsonify({"error": "Missing clerk_id"}), 400
         
         user = get_user_by_clerk_id(db, clerk_id)

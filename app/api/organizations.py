@@ -29,7 +29,7 @@ def get_all_orgs():
         return jsonify(orgs_list), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_course_orgs", methods=["GET"])
@@ -53,7 +53,7 @@ def get_course_orgs():
         return jsonify(orgs_list), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_club_orgs", methods=["GET"])
@@ -84,7 +84,7 @@ def get_club_orgs():
         return jsonify(orgs_list), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_courses", methods=["GET"])
@@ -117,7 +117,7 @@ def create_org_record():
         return jsonify({"status": "created", "org_id": org.id}), 201
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/create_category", methods=["POST"])
@@ -137,7 +137,7 @@ def create_category_record():
         return jsonify({"status": "category created", "category_id": category.id}), 201
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 
@@ -175,7 +175,7 @@ def delete_events_and_deactivate_calendar(org_id: int, calendar_source_id: int):
 
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": "Internal server error"}), 500
 
 @orgs_bp.route("/create_test_clubs", methods=["POST"])
@@ -215,7 +215,7 @@ def create_test_clubs():
         
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/create_admin", methods=["POST"])
@@ -238,7 +238,7 @@ def create_admin_record():
         return jsonify({"status": "admin created", "user": admin.user_id, "org": admin.org_id}), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/bulk_create_admins", methods=["POST"])
@@ -340,7 +340,7 @@ def bulk_create_admins():
             
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_admins_in_org", methods=["GET"])
@@ -372,7 +372,7 @@ def get_admins_in_org():
         return jsonify(admins_list), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @orgs_bp.route("/get_user_role_in_org", methods=["GET"])
@@ -397,6 +397,6 @@ def get_user_role_in_org():
         return jsonify({"role": admin.role}), 200
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 

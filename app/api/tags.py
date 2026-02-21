@@ -1,7 +1,7 @@
-from zoneinfo import ZoneInfo
-from flask import Blueprint, jsonify, request, g
+from flask import Blueprint, jsonify, g
 from app.models.tag import get_all_tags
 from app.models.event_tag import get_tags_by_event
+import traceback
 
 tags_bp = Blueprint("tags", __name__)
 
@@ -12,7 +12,7 @@ def get_tags():
         tags = get_all_tags(db)
         return jsonify([{"name": tag.name, "id": tag.id} for tag in tags]), 200
     except Exception as e:
-        print("Exception:", e)
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @tags_bp.route("/<event_id>", methods=["GET"])
@@ -24,6 +24,5 @@ def get_event_tags(event_id):
         return tag_names
 
     except Exception as e:
-        import traceback
         print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500

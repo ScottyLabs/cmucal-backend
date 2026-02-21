@@ -62,7 +62,7 @@ END:VCALENDAR
         ical_text_or_url=ics,
         org_id=org.id,
         category_id=category.id,
-        calendar_source_id=source.id,  # ✅ REQUIRED
+        calendar_source_id=source.id,  # REQUIRED
         default_event_type="CLUB",
         user_id=user.id,
     )

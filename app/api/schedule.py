@@ -126,7 +126,7 @@ def get_schedule_route():
         return jsonify({"courses": list(courses.values()), "clubs": list(clubs.values())})
     except Exception as e:
         import traceback
-        print("❌ Exception:", traceback.format_exc())
+        print("Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
 
 @schedule_bp.route('/category/<int:category_id>', methods=['DELETE'])

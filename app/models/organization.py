@@ -97,8 +97,8 @@ def create_course_orgs_from_file(db):
             crosslist_group = CrosslistGroup(name=title)
             db.add(crosslist_group)
             db.flush()
-            print(f"✅ Created crosslist group: {crosslist_group.id}")
-            print(f"✅ Linking course {course.id} to group {crosslist_group.id}")
+            print(f"Created crosslist group: {crosslist_group.id}")
+            print(f"Linking course {course.id} to group {crosslist_group.id}")
 
             crosslist_course = CourseCrosslist(course_id=course.id, group_id=crosslist_group.id)
             db.add(crosslist_course)

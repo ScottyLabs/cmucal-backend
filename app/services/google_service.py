@@ -102,7 +102,7 @@ def delete_event(credentials, event_id, calendar_id):
         service = build_calendar_service(credentials)
         service.events().delete(calendarId=calendar_id, eventId=event_id).execute()
     except Exception as e:
-        print(f"❌ Google API error deleting event {event_id} from {calendar_id}:", e)
+        print(f"Google API error deleting event {event_id} from {calendar_id}:", e)
         raise
 
 def create_cmucal_calendar(credentials):

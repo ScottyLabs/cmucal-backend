@@ -28,7 +28,7 @@ def init_db():
 
     if is_pytest and not allow_test_db:
         raise RuntimeError(
-            "❌ Pytest detected but ALLOW_TEST_DB is not set. "
+            "Pytest detected but ALLOW_TEST_DB is not set. "
             "Refusing to connect to database."
         )
 

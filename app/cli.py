@@ -13,6 +13,6 @@ def import_courses_command():
     try:
         result = create_course_orgs_from_file(db)
         db.commit()
-        click.echo(f"✅ Imported {len(result)} course orgs successfully.")
+        click.echo(f"Imported {len(result)} course orgs successfully.")
     except Exception as e:
-        click.echo(f"❌ Error: {e}")
+        click.echo(f"Error: {e}")

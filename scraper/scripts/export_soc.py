@@ -24,9 +24,9 @@ def export_soc_safe():
     try:
         logger.info("🚀 SOC export started")
         export_soc()
-        logger.info("✅ SOC export finished successfully")
+        logger.info("SOC export finished successfully")
     except Exception:
-        logger.error("❌ export_soc failed")
+        logger.error("export_soc failed")
         logger.error(traceback.format_exc())
 
 def export_soc():
@@ -44,17 +44,17 @@ def export_soc():
     # for (course_num, semester), org_id in org_id_by_key.items():
     #     print(course_num, semester, org_id)
     upsert_courses(db, courses, org_id_by_key)
-    print(f"✅ {len(orgs)} orgs and {len(courses)} courses")
+    print(f"{len(orgs)} orgs and {len(courses)} courses")
 
     # categories
     category_id_by_org = ensure_lecture_category(db, org_id_by_key)
-    print(f"✅ {len(category_id_by_org)} categories")
+    print(f"{len(category_id_by_org)} categories")
 
     # events + recurrence rules
     events, rrules = build_events_and_rrules(resources, org_id_by_key, category_id_by_org)
     event_id_by_identity = insert_events(db, events)
     replace_recurrence_rules(db, rrules, event_id_by_identity)
-    print(f"✅ {len(events)} events and {len(rrules)} recurrence rules")
+    print(f"{len(events)} events and {len(rrules)} recurrence rules")
 
     print(f"...Regenerating occurrences via {API_BASE_URL}")
     affected_event_ids = list(event_id_by_identity.values())
@@ -70,7 +70,7 @@ def export_soc():
             pass  # regeneration continues server-side
         # print(f"If you see errors here, make sure to start the Flask server before running this script. Timeout errors can be ignored.")
         
-    print(f"✅ Called regeneration for {len(affected_event_ids)} events. See logs for details.")
+    print(f"Called regeneration for {len(affected_event_ids)} events. See logs for details.")
 
 if __name__ == "__main__":
     export_soc()
