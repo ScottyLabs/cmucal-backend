@@ -443,6 +443,64 @@ END:VCALENDAR
         assert exdate_utc not in starts, "EXDATE occurrence should be excluded"
 
 
+class TestExdateCancelledDedupNoRdate:
+    """
+    Regression: if the same occurrence is excluded by both EXDATE and
+    RECURRENCE-ID + STATUS:CANCELLED, the import should create one
+    RecurrenceExdate row (not duplicates), even when there are no RDATEs.
+    """
+
+    DUP_DT = _BASE + timedelta(weeks=2)
+
+    ICS = f"""BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Google Inc//Google Calendar 70.9054//EN
+X-WR-TIMEZONE:America/New_York
+BEGIN:VEVENT
+UID:dedup-exdate-cancelled-001@google.com
+DTSTAMP:{DTSTAMP}
+DTSTART;TZID=America/New_York:{_BASE.strftime("%Y%m%dT%H%M%S")}
+DTEND;TZID=America/New_York:{(_BASE + timedelta(hours=1)).strftime("%Y%m%dT%H%M%S")}
+RRULE:FREQ=WEEKLY;COUNT=5;BYDAY=MO
+EXDATE;TZID=America/New_York:{DUP_DT.strftime("%Y%m%dT%H%M%S")}
+SUMMARY:Dedupe Exdate Cancelled
+LOCATION:GHC 4401
+END:VEVENT
+BEGIN:VEVENT
+UID:dedup-exdate-cancelled-001@google.com
+DTSTAMP:{DTSTAMP}
+RECURRENCE-ID;TZID=America/New_York:{DUP_DT.strftime("%Y%m%dT%H%M%S")}
+STATUS:CANCELLED
+END:VEVENT
+END:VCALENDAR
+"""
+
+    def test_same_occurrence_excluded_once(self, scaffold):
+        result = _import(scaffold, self.ICS)
+        assert result["success"]
+        db = scaffold["db"]
+        event_id = result["event_ids"][0]
+
+        starts = _occurrence_starts(db, event_id)
+        assert len(starts) == 4
+
+    def test_no_duplicate_exdate_rows(self, scaffold):
+        result = _import(scaffold, self.ICS)
+        assert result["success"]
+        db = scaffold["db"]
+        event_id = result["event_ids"][0]
+
+        rule = db.query(RecurrenceRule).filter_by(event_id=event_id).first()
+        assert rule is not None
+
+        exdates = db.query(RecurrenceExdate).filter_by(rrule_id=rule.id).all()
+        matching = [
+            x for x in exdates
+            if x.exdate == self.DUP_DT.astimezone(timezone.utc)
+        ]
+        assert len(matching) == 1, "Expected one EXDATE row for duplicated exclusion date"
+
+
 # ============================================================================
 # 7. Override (not cancelled): modified instance should still appear
 # ============================================================================

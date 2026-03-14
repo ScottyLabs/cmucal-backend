@@ -531,6 +531,10 @@ def _process_uid_group_with_helpers(
                 ))
                 db_session.flush()
 
+        # Ensure newly added EXDATE/RDATE rows are visible to dedupe query
+        # even when the session has autoflush disabled.
+        db_session.flush()
+
         # Store overrides for this UID (RECURRENCE-ID)
         db_session.query(EventOverride).filter_by(rrule_id=rule.id).delete(synchronize_session=False)
         existing_exdates_utc = {
