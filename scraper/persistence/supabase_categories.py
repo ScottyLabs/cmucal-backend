@@ -1,7 +1,23 @@
 from scraper.persistence.supabase_writer import chunked
 
+
+
+
 def ensure_lecture_category(db, org_id_by_key: dict) -> dict:
-    CATEGORY_NAME = "Lecture and Recitations"
+    """
+    Returns:
+        {
+            org_id: {
+                "LECTURE": lecture_category_id,
+                "RECITATION": recitation_category_id
+            }
+        }
+    """
+    CATEGORY_NAMES = {
+        "LECTURE": "Lectures",
+        "RECITATION": "Recitations",
+    }
+
     org_ids = list(set(org_id_by_key.values()))
 
     # ---- fetch existing categories (chunked) ----
@@ -16,20 +32,26 @@ def ensure_lecture_category(db, org_id_by_key: dict) -> dict:
         )
         existing.extend(res)
 
-    category_by_org = {
-        row["org_id"]: row["id"] for row in existing if row["name"] == CATEGORY_NAME
-    }
+    category_map = {}
 
-    # ---- insert missing categories ----
+    # Build existing lookup
+    for row in existing:
+        if row["org_id"] not in category_map:
+            category_map[row["org_id"]] = {}
+
+        for key, name in CATEGORY_NAMES.items():
+            if row["name"] == name:
+                category_map[row["org_id"]][key] = row["id"]
+    # Insert missing
     rows_to_insert = []
     for org_id in org_ids:
-        if org_id not in category_by_org:
-            rows_to_insert.append(
-                {
+        category_map.setdefault(org_id, {})
+        for key, name in CATEGORY_NAMES.items():
+            if key not in category_map[org_id]:
+                rows_to_insert.append({
                     "org_id": org_id,
-                    "name": CATEGORY_NAME,
-                }
-            )
+                    "name": name,
+                })
 
     if rows_to_insert:
         # defensive cleanup
@@ -42,8 +64,8 @@ def ensure_lecture_category(db, org_id_by_key: dict) -> dict:
 
         db.table("categories").insert(cleaned).execute()
 
-    # ---- refetch IDs ----
-    all_categories = []
+    # re-fetch to get IDs of newly inserted categories
+    refreshed = []
     for batch in chunked(org_ids, 200):
         res = (
             db.table("categories")
@@ -52,10 +74,13 @@ def ensure_lecture_category(db, org_id_by_key: dict) -> dict:
             .execute()
             .data
         )
-        all_categories.extend(res)
+        refreshed.extend(res)
 
-    return {
-        row["org_id"]: row["id"]
-        for row in all_categories
-        if row["name"] == CATEGORY_NAME
-    }
+    result = {}
+    for row in refreshed:
+        org_id = row["org_id"]
+        result.setdefault(org_id, {})
+        for key, name in CATEGORY_NAMES.items():
+            if row["name"] == name:
+                result[org_id][key] = row["id"]
+    return result

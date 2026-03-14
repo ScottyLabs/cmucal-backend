@@ -2,7 +2,7 @@ from scraper.helpers.recurrence import parse_soc_time, build_rrule_from_parts
 from scraper.helpers.event import event_identity, group_soc_rows
 from scraper.helpers.timezone import timezone_from_location
 
-def build_events_and_rrules(soc_rows, org_id_by_key, category_id_by_org):
+def build_events_and_rrules(soc_rows, org_id_by_key, category_id_by_org, agent_run_id,):
     from collections import defaultdict
     import datetime
 
@@ -22,9 +22,16 @@ def build_events_and_rrules(soc_rows, org_id_by_key, category_id_by_org):
     ), rows in grouped.items():
 
         soc0 = rows[0]
-
         org_id = org_id_by_key[(course_num, semester)]
-        category_id = category_id_by_org[org_id]
+
+        section_type = (lecture_section or "").upper()
+        if "LEC" in section_type or "LECTURE" in section_type:
+            category_key = "LECTURE"
+        else:
+            category_key = "RECITATION"  # fallback
+        category_id = category_id_by_org[org_id][category_key]
+
+        
         tz = timezone_from_location(location)
 
         start_dt = datetime.datetime.combine(
@@ -60,6 +67,7 @@ def build_events_and_rrules(soc_rows, org_id_by_key, category_id_by_org):
             "is_all_day": False,
             "event_timezone": str(tz),
             "category_id": category_id,
+            "agent_run_id": agent_run_id,
             "description": description,
             "event_type": "ACADEMIC",
             "source_url": "https://enr-apps.as.cmu.edu/open/SOC/SOCServlet/completeSchedule",

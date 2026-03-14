@@ -58,12 +58,13 @@ def make_soc(location="Pittsburgh, Pennsylvania"):
 def test_build_events_timezone_aware():
     soc = make_soc()
     org_id_by_key = {("15112", "Spring_26"): 1}
-    category_id_by_org = {1: 10}
+    category_id_by_org = {1: {"LECTURE": 10, "RECITATION": 11}}
 
     events, rrules = build_events_and_rrules(
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     event = events[0]
@@ -75,12 +76,13 @@ def test_build_events_timezone_aware():
 def test_dst_transition_new_york():
     soc = make_soc()
     org_id_by_key = {("15112", "Spring_26"): 1}
-    category_id_by_org = {1: 10}
+    category_id_by_org = {1: {"LECTURE": 10, "RECITATION": 11}}
 
     events, _ = build_events_and_rrules(
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     start = events[0]["start_datetime"]
@@ -101,6 +103,7 @@ def test_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
     start = events[0]["start_datetime"]
     # March 30, 2026 should be EDT (UTC-4)
@@ -116,12 +119,13 @@ def test_event_and_rrule_timezone_consistency():
     soc = make_soc("Pittsburgh, Pennsylvania")
 
     org_id_by_key = {("15112", "Spring_26"): 1}
-    category_id_by_org = {1: 10}
+    category_id_by_org = {1: {"LECTURE": 10, "RECITATION": 11}}
 
     events, rrules = build_events_and_rrules(
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     event = events[0]
@@ -144,7 +148,7 @@ def test_rrule_dst_transition_new_york():
     soc = make_soc("Pittsburgh, Pennsylvania")
 
     org_id_by_key = {("15112", "Spring_26"): 1}
-    category_id_by_org = {1: 10}
+    category_id_by_org = {1: {"LECTURE": 10, "RECITATION": 11}}
 
     # ---- Pre-DST (EST) ----
     soc.sem_start = datetime(2026, 1, 12)  # EST
@@ -152,6 +156,7 @@ def test_rrule_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     rrule_start = rrules[0]["start_datetime"]
@@ -166,6 +171,7 @@ def test_rrule_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     rrule_start = rrules[0]["start_datetime"]
