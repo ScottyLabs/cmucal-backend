@@ -130,10 +130,14 @@ END:VCALENDAR
         starts = _occurrence_starts(db, event_id)
         assert len(starts) == 5, f"Expected 5 occurrences, got {len(starts)}"
 
-        # Each occurrence should be 7 days apart
-        for i in range(1, len(starts)):
-            delta = starts[i] - starts[i - 1]
-            assert delta == timedelta(days=7), f"Gap {i}: {delta}"
+        # Each occurrence should be 7 days apart in the event's local timezone.
+        # (UTC gaps vary when crossing DST, so we check in local time.)
+        event = db.query(Event).get(event_id)
+        event_tz = ZoneInfo(event.event_timezone)
+        starts_local = [s.astimezone(event_tz) for s in starts]
+        for i in range(1, len(starts_local)):
+            delta = starts_local[i] - starts_local[i - 1]
+            assert delta == timedelta(days=7), f"Gap {i} (local): {delta}"
 
 
 # ============================================================================

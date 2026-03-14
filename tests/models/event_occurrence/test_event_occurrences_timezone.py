@@ -21,13 +21,9 @@ def test_recurring_event_occurrences_respect_local_time_across_dst(
 
     # ── Arrange ───────────────────────────────────────────────
 
-    # Base event: 6:00 PM America/New_York (local time)
-    now_local = datetime.now(NY)
-    start_local = (
-        now_local
-        .replace(hour=18, minute=0, second=0, microsecond=0)
-        + timedelta(days=1)
-    )
+    # Base event: 6:00 PM America/New_York on a date that crosses DST.
+    # Oct 25, 2026 is EDT; Nov 1 is EST (DST ends). 20 weekly occurrences span both.
+    start_local = datetime(2026, 10, 25, 18, 0, 0, tzinfo=NY)
     end_local = start_local + timedelta(hours=4)
     event_timezone = "America/New_York"
 
