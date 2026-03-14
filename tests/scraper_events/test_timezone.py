@@ -64,6 +64,7 @@ def test_build_events_timezone_aware():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     event = events[0]
@@ -81,6 +82,7 @@ def test_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     start = events[0]["start_datetime"]
@@ -101,6 +103,7 @@ def test_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
     start = events[0]["start_datetime"]
     # March 30, 2026 should be EDT (UTC-4)
@@ -122,6 +125,7 @@ def test_event_and_rrule_timezone_consistency():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     event = events[0]
@@ -152,6 +156,7 @@ def test_rrule_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     rrule_start = rrules[0]["start_datetime"]
@@ -166,6 +171,7 @@ def test_rrule_dst_transition_new_york():
         [soc],
         org_id_by_key,
         category_id_by_org,
+        agent_run_id=None,
     )
 
     rrule_start = rrules[0]["start_datetime"]
