@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request, g
 from sqlalchemy.orm import joinedload, subqueryload
-from app.models.models import User, Schedule, Category, Organization, EventOccurrence, Event
+from sqlalchemy import or_
+from app.models.models import User, Schedule, Category, Organization, EventOccurrence, Event, CalendarSource
 from app.utils.auth import get_current_user
 
 schedule_bp = Blueprint('schedule_bp', __name__)
@@ -75,18 +76,21 @@ def get_schedule_route():
                         "name": category.name
                     })
                     
-                    # Get events for this category
-                    events = db.query(Event).filter(
+                    # Get events for this category (exclude events from inactive sources)
+                    events = db.query(Event).outerjoin(
+                        CalendarSource, Event.calendar_source_id == CalendarSource.id
+                    ).filter(
                         Event.org_id == org.id,
-                        Event.category_id == category.id
+                        Event.category_id == category.id,
+                        or_(Event.calendar_source_id == None, CalendarSource.active == True),  # noqa: E711
                     ).all()
-                    
+
                     # Get event occurrences
                     event_ids = [e.id for e in events]
                     occurrences = db.query(EventOccurrence).filter(
                         EventOccurrence.event_id.in_(event_ids)
                     ).all()
-                    
+
                     courses[org.id]["events"][category.name] = [event_occurrence_to_dict(o) for o in occurrences]
             
             elif org.type == "CLUB":
@@ -104,13 +108,15 @@ def get_schedule_route():
                         "name": category.name
                     })
                     
-                    # Get regular events for this category
-                    events = db.query(Event).filter(
+                    # Get regular events for this category (exclude events from inactive sources)
+                    events = db.query(Event).outerjoin(
+                        CalendarSource, Event.calendar_source_id == CalendarSource.id
+                    ).filter(
                         Event.org_id == org.id,
-                        Event.category_id == category.id
+                        Event.category_id == category.id,
+                        or_(Event.calendar_source_id == None, CalendarSource.active == True),  # noqa: E711
                     ).all()
 
-                    # Convert regular events to the same format as occurrences
                     event_ids = [e.id for e in events]
 
                     occurrences = []
