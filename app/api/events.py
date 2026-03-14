@@ -29,9 +29,12 @@ def _import_ical_background(source_id, gcal_link, org_id, category_id, semester,
     db = get_session()
     try:
         cs = db.query(CalendarSource).filter(CalendarSource.id == source_id).first()
-        if cs:
-            cs.last_sync_status = "syncing"
-            db.commit()
+        if not cs:
+            # Source was deleted between the main-thread commit and this thread starting
+            return
+
+        cs.last_sync_status = "syncing"
+        db.commit()
 
         ics_message = import_ical_feed_using_helpers(
             db_session=db,
@@ -645,8 +648,6 @@ def delete_event(event_id: int):
         event = db.query(Event).filter(Event.id == event_id).one_or_none()
         if not event:
             return jsonify({"error": "Event not found"}), 404
-
-        event_id_subq = select(Event.id).where(Event.id == event_id)
 
         db.execute(delete(EventOccurrence).where(EventOccurrence.event_id == event_id))
         db.execute(delete(EventTag).where(EventTag.event_id == event_id))

@@ -547,6 +547,7 @@ def get_admins_in_org():
             print(f"Admin User: {andrew_id}, Org: {org.name}, Role: {admin.role}")
             admins_list.append({
                 "user_id": user.id,
+                "clerk_id": user.clerk_id,
                 "andrew_id": andrew_id,
                 "user_email": user.email,
                 "org_id": org.id,
@@ -642,7 +643,7 @@ def toggle_calendar_source_active(org_id: int, cs_id: int):
     )
 
 
-@orgs_bp.route("/<int:org_id>/calendar-sources/<int:cs_id>", methods=["DELETE"])
+@orgs_bp.route("/<int:org_id>/calendar_sources/<int:cs_id>", methods=["DELETE"])
 def delete_calendar_source(org_id: int, cs_id: int):
     """Delete a CalendarSource and all its events."""
     db = g.db
