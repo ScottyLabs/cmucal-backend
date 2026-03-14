@@ -826,3 +826,30 @@ def get_event_category(category_id):
         import traceback
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+
+@events_bp.route("/by_org/<int:org_id>", methods=["GET"])
+def get_events_by_organization(org_id: int):
+    db = g.db
+    # join Event -> CalendarSource to filter by CalendarSource.org_id
+    events = (
+        db.query(Event)
+        .join(CalendarSource, Event.calendar_source_id == CalendarSource.id)
+        .filter(CalendarSource.org_id == org_id)
+        .options(joinedload(Event.calendar_source))
+        .all()
+    )
+
+    def event_to_dict(ev):
+        return {
+            "id": ev.id,
+            "title": ev.title,
+            "description": ev.description,
+            "start_datetime": ev.start_datetime.isoformat() if ev.start_datetime else None,
+            "end_datetime": ev.end_datetime.isoformat() if ev.end_datetime else None,
+            "all_day": ev.all_day,
+            "calendar_source_id": ev.calendar_source_id,
+            "created_at": ev.created_at.isoformat() if ev.created_at else None,
+            "updated_at": ev.updated_at.isoformat() if ev.updated_at else None,
+        }
+
+    return jsonify({"events": [event_to_dict(e) for e in events]}), 200
