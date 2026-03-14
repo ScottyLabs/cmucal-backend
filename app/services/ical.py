@@ -533,14 +533,30 @@ def _process_uid_group_with_helpers(
 
         # Store overrides for this UID (RECURRENCE-ID)
         db_session.query(EventOverride).filter_by(rrule_id=rule.id).delete(synchronize_session=False)
+        existing_exdates_utc = {
+            _ensure_aware(x.exdate).astimezone(timezone.utc)
+            for x in db_session.query(RecurrenceExdate).filter_by(rrule_id=rule.id).all()
+        }
         for oc in override_components:
             rid = oc.get("RECURRENCE-ID")
             if not rid:
                 continue
-            rid_dt = normalize_ics_datetime(rid.dt, calendar_tz)
+
+            rid_dt_utc = normalize_ics_datetime(rid.dt, calendar_tz).astimezone(timezone.utc)
+            status = str(oc.get("STATUS") or "").strip().upper()
+
+            if status == "CANCELLED":
+                if rid_dt_utc not in existing_exdates_utc:
+                    db_session.add(RecurrenceExdate(
+                        rrule_id=rule.id,
+                        exdate=rid_dt_utc,
+                    ))
+                    existing_exdates_utc.add(rid_dt_utc)
+                continue
+
             db_session.add(EventOverride(
                 rrule_id=rule.id,
-                recurrence_date=rid_dt.astimezone(timezone.utc),
+                recurrence_date=rid_dt_utc,
                 new_start=decoded_dt_with_tz(oc, "DTSTART"),
                 new_end=decoded_dt_with_tz(oc, "DTEND"),
                 new_title=str(oc.get("SUMMARY") or None),

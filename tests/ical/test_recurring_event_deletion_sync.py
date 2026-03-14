@@ -9,8 +9,7 @@ Google Calendar uses two mechanisms to communicate deleted recurring instances:
   1. EXDATE entries on the base VEVENT (explicit date exclusions)
   2. STATUS:CANCELLED on a VEVENT with RECURRENCE-ID (cancelled instance)
 
-The current codebase handles mechanism (1) but NOT mechanism (2).
-These tests verify both paths and expose the STATUS:CANCELLED gap.
+These tests verify both paths and guard against regressions.
 """
 
 import pytest
@@ -248,8 +247,8 @@ class TestStatusCancelledSingleDeletion:
       - RECURRENCE-ID pointing to the original occurrence date
       - STATUS:CANCELLED
 
-    The current code stores this as an EventOverride but does NOT check STATUS,
-    so the occurrence still appears. These tests document the expected behavior.
+    Cancelled RECURRENCE-ID instances should be excluded from generated
+    occurrences and represented as exdates.
     """
 
     CANCELLED_DT = _BASE + timedelta(weeks=2)  # delete week 3
@@ -279,11 +278,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED on RECURRENCE-ID is not handled — "
-               "cancelled occurrence still appears as an EventOverride",
-        strict=True,
-    )
     def test_cancelled_instance_excluded_from_occurrences(self, scaffold):
         """The cancelled instance should NOT appear in generated occurrences."""
         result = _import(scaffold, self.ICS)
@@ -297,8 +291,8 @@ END:VCALENDAR
             "The STATUS:CANCELLED instance was not excluded."
         )
 
-    def test_cancelled_instance_stored_as_override(self, scaffold):
-        """Verify the RECURRENCE-ID component is stored as an EventOverride."""
+    def test_cancelled_instance_stored_as_exdate(self, scaffold):
+        """Cancelled RECURRENCE-ID should create an EXDATE, not an override."""
         result = _import(scaffold, self.ICS)
         db = scaffold["db"]
         event_id = result["event_ids"][0]
@@ -306,25 +300,19 @@ END:VCALENDAR
         assert rule is not None
 
         overrides = db.query(EventOverride).filter_by(rrule_id=rule.id).all()
-        assert len(overrides) == 1, "Should have 1 EventOverride for the RECURRENCE-ID"
+        assert len(overrides) == 0, "Cancelled instance should not create EventOverride"
 
-    def test_occurrence_count_includes_cancelled_bug(self, scaffold):
-        """
-        Current behavior (bug): The cancelled instance IS included in occurrences
-        because STATUS:CANCELLED is ignored. This test documents the current
-        (broken) behavior.
-        """
+        exdates = db.query(RecurrenceExdate).filter_by(rrule_id=rule.id).all()
+        assert len(exdates) == 1, "Cancelled instance should create one RecurrenceExdate"
+
+    def test_occurrence_count_excludes_cancelled_instance(self, scaffold):
+        """Recurring occurrence count should exclude cancelled RECURRENCE-ID."""
         result = _import(scaffold, self.ICS)
         db = scaffold["db"]
         event_id = result["event_ids"][0]
 
         starts = _occurrence_starts(db, event_id)
-        # BUG: still 5 occurrences because the cancelled one becomes an override
-        # rather than being excluded
-        assert len(starts) == 5, (
-            "Current behavior: cancelled occurrence is still present as an override. "
-            "If this assertion fails, it means the bug has been fixed!"
-        )
+        assert len(starts) == 4, "Cancelled occurrence should be excluded"
 
 
 # ============================================================================
@@ -370,10 +358,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED not handled — both cancelled instances still appear",
-        strict=True,
-    )
     def test_two_cancelled_instances_excluded(self, scaffold):
         result = _import(scaffold, self.ICS)
         assert result["success"]
@@ -385,13 +369,17 @@ END:VCALENDAR
             f"Expected 3 occurrences (5 - 2 cancelled), got {len(starts)}"
         )
 
-    def test_two_overrides_stored(self, scaffold):
+    def test_two_exdates_stored_for_cancellations(self, scaffold):
         result = _import(scaffold, self.ICS)
         db = scaffold["db"]
         event_id = result["event_ids"][0]
         rule = db.query(RecurrenceRule).filter_by(event_id=event_id).first()
+
         overrides = db.query(EventOverride).filter_by(rrule_id=rule.id).all()
-        assert len(overrides) == 2
+        assert len(overrides) == 0
+
+        exdates = db.query(RecurrenceExdate).filter_by(rrule_id=rule.id).all()
+        assert len(exdates) == 2
 
 
 # ============================================================================
@@ -433,10 +421,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED portion not handled — only EXDATE deletion works",
-        strict=True,
-    )
     def test_both_deletion_types_honored(self, scaffold):
         result = _import(scaffold, self.ICS)
         assert result["success"]
@@ -667,10 +651,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED not handled on re-import",
-        strict=True,
-    )
     def test_reimport_with_cancellation_removes_occurrence(self, scaffold):
         result1 = _import(scaffold, self.ICS_BEFORE)
         assert result1["success"]
@@ -793,10 +773,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED not handled, and minimal component may crash",
-        strict=True,
-    )
     def test_minimal_cancelled_component_excluded(self, scaffold):
         result = _import(scaffold, self.ICS)
         assert result["success"]
@@ -949,10 +925,6 @@ END:VEVENT
 END:VCALENDAR
 """
 
-    @pytest.mark.xfail(
-        reason="BUG: STATUS:CANCELLED not excluded; expecting 4 occurrences but get 5",
-        strict=True,
-    )
     def test_complex_scenario_correct_occurrence_count(self, scaffold):
         result = _import(scaffold, self.ICS)
         assert result["success"]
@@ -1005,7 +977,7 @@ END:VCALENDAR
         assert len(overridden) == 1
 
     def test_data_model_integrity(self, scaffold):
-        """Verify the DB state: 1 event, 1 rule, 1 exdate, 2 overrides."""
+        """Verify DB state: 1 event, 1 rule, 2 exdates, 1 override."""
         result = _import(scaffold, self.ICS)
         db = scaffold["db"]
         event_id = result["event_ids"][0]
@@ -1014,11 +986,11 @@ END:VCALENDAR
         assert rule is not None
 
         exdates = db.query(RecurrenceExdate).filter_by(rrule_id=rule.id).all()
-        assert len(exdates) == 1
+        assert len(exdates) == 2
 
         overrides = db.query(EventOverride).filter_by(rrule_id=rule.id).all()
-        assert len(overrides) == 2, (
-            "Should have 2 overrides: 1 modified + 1 cancelled"
+        assert len(overrides) == 1, (
+            "Should have 1 override (modified instance) and 1 cancelled exdate"
         )
 
 
