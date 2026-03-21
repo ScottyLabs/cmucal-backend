@@ -385,7 +385,6 @@ def _process_uid_group_with_helpers(
             event_row.ical_sequence = seq
             event_row.ical_last_modified = _ensure_aware(last_modified) if last_modified else None
             db_session.flush()
-            event = event_row
 
     else:
         # Create via your helper (expects ISO strings)
