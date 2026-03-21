@@ -386,10 +386,7 @@ def _process_uid_group_with_helpers(
             event_row.ical_last_modified = _ensure_aware(last_modified) if last_modified else None
             db_session.flush()
             event = event_row
-        else:
-            print(f"No changes detected for event {event_row.id}")
-            # will skip the rest of the steps for this event.
-            return event_row.id
+
     else:
         # Create via your helper (expects ISO strings)
         event = save_event(
