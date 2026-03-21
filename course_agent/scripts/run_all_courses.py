@@ -29,6 +29,7 @@ def main():
     course_no_calendars_data = []
     course_no_sites_data = []
     successful_courses_data = []
+    all_results_data = []
 
     for course in courses:
         category_id = get_or_build_category_for_course(course)
@@ -54,6 +55,25 @@ def main():
             f"Course {course['course_number']} - {course['course_name']} completed with status: {final_state.get('terminal_status')}"
         )
 
+        all_results_data.append(
+            {
+                "course_id": course["id"],
+                "course_number": course["course_number"],
+                "course_name": course["course_name"],
+                "org_id": course["org_id"],
+                "agent_run_id": agent_run_id,
+                "terminal_status": final_state.get("terminal_status"),
+                "proposed_site_url": final_state.get("proposed_site_url"),
+                "verified_site_url": final_state.get("verified_site_url"),
+                "iframe_url": final_state.get("iframe_url"),
+                "ical_link": final_state.get("ical_link"),
+                "verifier_score": final_state.get("verifier_score"),
+                "critic_score": final_state.get("critic_score"),
+                "heuristic_score": final_state.get("heuristic_score"),
+                "final_score": final_state.get("final_score"),
+            }
+        )
+
         if final_state.get("terminal_status") == "no_site_found":
             course_no_sites += 1
             course_no_sites_data.append(course)
@@ -71,6 +91,8 @@ def main():
     print(f"Courses with no calendar found: {course_no_calendars}")
 
     # Export results to CSV files
+    write_courses_csv(all_results_data, "course_agent_results.csv")
+
     write_courses_csv(successful_courses_data, "successful_courses.csv")
 
     write_courses_csv(course_no_sites_data, "courses_no_site_found.csv")

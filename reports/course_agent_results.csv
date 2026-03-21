@@ -1,0 +1,5 @@
+course_id,course_number,course_name,org_id,agent_run_id,terminal_status,proposed_site_url,verified_site_url,iframe_url,ical_link,verifier_score,critic_score,heuristic_score,final_score
+656,15213,Introduction to Computer Systems,698,10,no_calendar,https://www.cs.cmu.edu/~213/,https://www.cs.cmu.edu/~213/,,,0.9,0.9,0.7,0.9
+2320,17313,Foundations of Software Engineering,2362,10,success,https://cmu-313.github.io/,https://cmu-313.github.io/,https://calendar.google.com/calendar/embed?src=c_6ff178194982fe3e4cba4c28641acbb98c8c493febf2d427b07c4259d3c49a1f%40group.calendar.google.com&ctz=America%2FNew_York&mode=WEEK,https://calendar.google.com/calendar/ical/c_6ff178194982fe3e4cba4c28641acbb98c8c493febf2d427b07c4259d3c49a1f@group.calendar.google.com/public/basic.ics,0.9,0.9,0.3,0.78
+659,15281,Artificial Intelligence,701,10,no_calendar,https://www.cs.cmu.edu/~./15281/,https://www.cs.cmu.edu/~./15281/,,,0.9,0.9,0.7,0.9
+1740,10601,Machine Learning,1782,10,no_calendar,https://www.cs.cmu.edu/~mgormley/courses/10601/,https://www.cs.cmu.edu/~mgormley/courses/10601/,,,0.9,0.9,0.7,0.9
