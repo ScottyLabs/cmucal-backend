@@ -17,9 +17,58 @@ from app.services.ical import delete_events_for_calendar_source, import_ical_fee
 from app.errors.ical import ICalFetchError
 from app.models.calendar_source import create_calendar_source
 from app.utils.date import _parse_iso_aware
+from app.services.db import get_session
+import threading
 
 
 events_bp = Blueprint("events", __name__)
+
+
+def _import_ical_background(source_id, gcal_link, org_id, category_id, semester, event_type, user_id):
+    """Run iCal import in a background thread with its own DB session."""
+    db = get_session()
+    try:
+        cs = db.query(CalendarSource).filter(CalendarSource.id == source_id).first()
+        if not cs:
+            # Source was deleted between the main-thread commit and this thread starting
+            return
+
+        cs.last_sync_status = "syncing"
+        db.commit()
+
+        ics_message = import_ical_feed_using_helpers(
+            db_session=db,
+            ical_text_or_url=gcal_link,
+            org_id=org_id,
+            category_id=category_id,
+            semester=semester,
+            default_event_type=event_type,
+            user_id=user_id,
+            source_url=gcal_link,
+            calendar_source_id=source_id,
+        )
+
+        cs = db.query(CalendarSource).filter(CalendarSource.id == source_id).first()
+        if cs:
+            if ics_message.get("success") is False:
+                cs.last_sync_status = "error"
+                cs.last_error = ics_message.get("message", "Unknown error")
+            else:
+                cs.last_sync_status = "ok"
+                cs.last_fetched_at = datetime.now(timezone.utc)
+            db.commit()
+    except Exception:
+        import traceback
+        print("❌ Background iCal import error:", traceback.format_exc())
+        try:
+            cs = db.query(CalendarSource).filter(CalendarSource.id == source_id).first()
+            if cs:
+                cs.last_sync_status = "error"
+                db.commit()
+        except Exception:
+            pass
+    finally:
+        db.close()
 
 @events_bp.route("/create_event", methods=["POST"])
 def create_event_record():
@@ -140,8 +189,8 @@ def read_gcal_link():
         data = request.get_json()
         gcal_link = data.get("gcal_link")
         event_type = data.get("event_type", None)
-        org_id = data.get("org_id")
-        category_id = data.get("category_id")
+        org_id = int(data.get("org_id"))
+        category_id = int(data.get("category_id"))
         clerk_id = data.get("clerk_id", None)
         semester = data.get("semester", None)
         notes = data.get("notes", None)
@@ -152,8 +201,7 @@ def read_gcal_link():
         if not user:
             return jsonify({"error": "User not found"}), 404
 
-        # Ensure CalendarSource exists (category ⟶ many sources), 
-        # store the gcal link if it is not already stored
+        # Ensure CalendarSource exists — unique constraint is (category_id, url)
         calendar_source = (
             db.query(CalendarSource)
             .filter(
@@ -175,47 +223,37 @@ def read_gcal_link():
                 created_by_user_id=user.id,
             )
         else:
-            # Optional: update mutable fields
+            # Correct org_id if the record was created under a different/missing org
+            if calendar_source.org_id != org_id:
+                calendar_source.org_id = org_id
             if notes is not None:
                 calendar_source.notes = notes
             if event_type is not None:
                 calendar_source.default_event_type = event_type
             if calendar_source.active is False:
                 calendar_source.active = True
+
+        calendar_source.last_sync_status = "pending"
         db.flush()
 
-        ics_message = import_ical_feed_using_helpers(
-            db_session=db,
-            ical_text_or_url=gcal_link,
-            org_id=org_id,
-            category_id=category_id,
-            semester=semester,
-            default_event_type=event_type,
-            user_id=user.id,
-            source_url=gcal_link,
-            calendar_source_id=calendar_source.id
-        )
-        print(ics_message)
-        # Handle parse-level failure
-        if ics_message.get("success") is False:
-            return jsonify(ics_message), 400
+        # Commit immediately so the source shows up in the UI right away
+        db.commit()
+        source_id = calendar_source.id
 
-        db.commit()  # Only commit if all succeeded
+        # Scrape events in the background — uses its own DB session
+        thread = threading.Thread(
+            target=_import_ical_background,
+            args=(source_id, gcal_link, org_id, category_id, semester, event_type, user.id),
+            daemon=True,
+        )
+        thread.start()
+
         return jsonify({
             "success": True,
-            "message": "Google Calendar link processed successfully.",
-            "calendar_source_id": calendar_source.id,
+            "message": "Calendar source added. Events are being imported in the background.",
+            "calendar_source_id": source_id,
         }), 201
-    
-    # import_ical_feed_using_helpers errors
-    except ICalFetchError as e:
-        return jsonify({
-            "success": False,
-            "error": e.code,
-            "message": e.message,
-        }), 400
 
-    # Unexpected errors
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())
@@ -601,6 +639,37 @@ def batch_delete_events_by_params():
         import traceback
         print("❌ Exception:", traceback.format_exc())
         return jsonify({"error": str(e)}), 500
+
+@events_bp.route("/<int:event_id>", methods=["DELETE"])
+def delete_event(event_id: int):
+    """Delete a single event and all its dependent rows."""
+    db = g.db
+    try:
+        event = db.query(Event).filter(Event.id == event_id).one_or_none()
+        if not event:
+            return jsonify({"error": "Event not found"}), 404
+
+        db.execute(delete(EventOccurrence).where(EventOccurrence.event_id == event_id))
+        db.execute(delete(EventTag).where(EventTag.event_id == event_id))
+        db.execute(delete(UserSavedEvent).where(UserSavedEvent.event_id == event_id))
+
+        rrule_ids = select(RecurrenceRule.id).where(RecurrenceRule.event_id == event_id)
+        db.execute(delete(RecurrenceExdate).where(RecurrenceExdate.rrule_id.in_(rrule_ids)))
+        db.execute(delete(RecurrenceRdate).where(RecurrenceRdate.rrule_id.in_(rrule_ids)))
+        db.execute(delete(EventOverride).where(EventOverride.rrule_id.in_(rrule_ids)))
+        db.execute(delete(RecurrenceOverride).where(RecurrenceOverride.rrule_id.in_(rrule_ids)))
+        db.execute(delete(RecurrenceRule).where(RecurrenceRule.event_id == event_id))
+
+        db.execute(delete(Event).where(Event.id == event_id))
+        db.commit()
+
+        return jsonify({"status": "ok", "deleted_event_id": event_id}), 200
+
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
 
 @events_bp.route("/<event_id>", methods=["GET"])
 def get_specific_events(event_id):

@@ -1,9 +1,10 @@
 from flask import Blueprint, jsonify, request, g
+from sqlalchemy import or_
 from app.models.user import get_user_by_clerk_id, get_user_by_email, create_user_without_clerk, get_user_by_id
 from app.models.organization import create_organization, get_orgs_by_type, get_organization_by_name, get_organization_by_id
 from app.models.models import Organization, Category, Event, EventOccurrence, CalendarSource
 from app.models.admin import create_admin, delete_admin, update_admin, get_admin_by_org_and_user, get_admins_by_org
-from app.models.category import create_category, get_categories_by_org_id
+from app.models.category import create_category, get_categories_by_org_id, delete_category
 from app.models.calendar_source import deactivate_calendar_source
 from app.services.ical import delete_events_for_calendar_source
 from app.utils.course_data import get_course_data
@@ -56,19 +57,25 @@ def get_organization_data(org_id):
         # Get all categories for this org
         categories = db.query(Category).filter(Category.org_id == org.id).all()
         
+        # Build set of known category IDs for the uncategorized fallback
+        category_ids = [c.id for c in categories]
+
         # Add categories and their events
         for category in categories:
             org_data["categories"].append({
                 "id": category.id,
                 "name": category.name
             })
-            
-            # Get events for this category
-            events = db.query(Event).filter(
+
+            # Get events for this category (exclude events from inactive sources)
+            events = db.query(Event).outerjoin(
+                CalendarSource, Event.calendar_source_id == CalendarSource.id
+            ).filter(
                 Event.org_id == org.id,
-                Event.category_id == category.id
+                Event.category_id == category.id,
+                or_(Event.calendar_source_id == None, CalendarSource.active == True),  # noqa: E711
             ).all()
-            
+
             # Get event occurrences
             event_ids = [e.id for e in events]
             occurrences = []
@@ -76,9 +83,38 @@ def get_organization_data(org_id):
                 occurrences = db.query(EventOccurrence).filter(
                     EventOccurrence.event_id.in_(event_ids)
                 ).all()
-            
+
             org_data["events"][category.name] = [event_occurrence_to_dict(o) for o in occurrences]
-            
+
+        # Include events with no category (or stale category_id not in known set)
+        # Exclude events from inactive calendar sources in all cases
+        active_source_filter = or_(Event.calendar_source_id == None, CalendarSource.active == True)  # noqa: E711
+        uncategorized_events = db.query(Event).outerjoin(
+            CalendarSource, Event.calendar_source_id == CalendarSource.id
+        ).filter(
+            Event.org_id == org.id,
+            Event.category_id == None,  # noqa: E711
+            active_source_filter,
+        ).all()
+        if category_ids:
+            # Also grab events whose category_id was deleted
+            stale_events = db.query(Event).outerjoin(
+                CalendarSource, Event.calendar_source_id == CalendarSource.id
+            ).filter(
+                Event.org_id == org.id,
+                Event.category_id != None,  # noqa: E711
+                ~Event.category_id.in_(category_ids),
+                active_source_filter,
+            ).all()
+            uncategorized_events = uncategorized_events + stale_events
+
+        if uncategorized_events:
+            unc_event_ids = [e.id for e in uncategorized_events]
+            unc_occurrences = db.query(EventOccurrence).filter(
+                EventOccurrence.event_id.in_(unc_event_ids)
+            ).all()
+            org_data["events"]["Uncategorized"] = [event_occurrence_to_dict(o) for o in unc_occurrences]
+
         return jsonify(org_data)
 
     except Exception as e:
@@ -206,10 +242,33 @@ def create_category_record():
         name = data.get("name")
         if not name:
             return jsonify({"error": "Missing category name"}), 400
-        
+
         category = create_category(db, org_id=org_id, name=name)
         db.commit()
         return jsonify({"status": "category created", "category_id": category.id}), 201
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": str(e)}), 500
+
+
+@orgs_bp.route("/<int:org_id>/categories/<int:cat_id>", methods=["DELETE"])
+def delete_category_record(org_id: int, cat_id: int):
+    """Delete a category. Fails if the org doesn't own it."""
+    db = g.db
+    try:
+        from app.models.models import Category as CategoryModel
+        category = db.query(CategoryModel).filter(
+            CategoryModel.id == cat_id,
+            CategoryModel.org_id == org_id,
+        ).first()
+        if not category:
+            return jsonify({"error": "Category not found"}), 404
+        deleted = delete_category(db, category_id=cat_id)
+        if not deleted:
+            return jsonify({"error": "Category not found"}), 404
+        db.commit()
+        return jsonify({"status": "category deleted", "category_id": cat_id}), 200
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())
@@ -356,9 +415,11 @@ def delete_admin_record():
             return jsonify({"error": "Missing org_id"}), 400
         
         
-        admin = delete_admin(db, org_id=org_id, user_id=user_id) 
+        deleted = delete_admin(db, org_id=org_id, user_id=user_id)
+        if not deleted:
+            return jsonify({"error": "Admin not found"}), 404
         db.commit()
-        return jsonify({"status": "admin deleted", "user": admin.user_id, "org": admin.org_id}), 200
+        return jsonify({"status": "admin deleted", "user": user_id, "org": org_id}), 200
     except Exception as e:
         import traceback
         print("❌ Exception:", traceback.format_exc())
@@ -381,6 +442,8 @@ def bulk_create_admins():
         user_emails_str = data.get("user_emails")
         organization_name = data.get("organization_name")
         
+        role = data.get("role", "admin")
+
         if not user_emails_str or not organization_name:
             return jsonify({"error": "Missing user_emails or organization_name"}), 400
         
@@ -429,10 +492,10 @@ def bulk_create_admins():
                 # Create admin relationship
                 category_id = categories[0].id if categories else None
                 admin = create_admin(
-                    db, 
-                    org_id=organization.id, 
-                    user_id=user.id, 
-                    role="admin",
+                    db,
+                    org_id=organization.id,
+                    user_id=user.id,
+                    role=role,
                     category_id=category_id
                 )
                 created_admins.append({
@@ -484,6 +547,7 @@ def get_admins_in_org():
             print(f"Admin User: {andrew_id}, Org: {org.name}, Role: {admin.role}")
             admins_list.append({
                 "user_id": user.id,
+                "clerk_id": user.clerk_id,
                 "andrew_id": andrew_id,
                 "user_email": user.email,
                 "org_id": org.id,
@@ -539,6 +603,8 @@ def list_calendar_sources(org_id: int):
             "notes": getattr(cs, "notes", None),
             "default_event_type": getattr(cs, "default_event_type", None),
             "created_by_user_id": getattr(cs, "created_by_user_id", None),
+            "last_sync_status": getattr(cs, "last_sync_status", None),
+            "last_fetched_at": getattr(cs, "last_fetched_at", None).isoformat() if getattr(cs, "last_fetched_at", None) else None,
             "created_at": getattr(cs, "created_at", None).isoformat() if getattr(cs, "created_at", None) else None,
             "updated_at": getattr(cs, "updated_at", None).isoformat() if getattr(cs, "updated_at", None) else None,
         }
@@ -575,6 +641,34 @@ def toggle_calendar_source_active(org_id: int, cs_id: int):
         ),
         200,
     )
+
+
+@orgs_bp.route("/<int:org_id>/calendar_sources/<int:cs_id>", methods=["DELETE"])
+def delete_calendar_source(org_id: int, cs_id: int):
+    """Delete a CalendarSource and all its events."""
+    db = g.db
+    try:
+        calendar_source = (
+            db.query(CalendarSource)
+            .filter(CalendarSource.id == cs_id, CalendarSource.org_id == org_id)
+            .one_or_none()
+        )
+        if not calendar_source:
+            return jsonify({"error": "CalendarSource not found"}), 404
+
+        # Delete all events attached to this source first
+        delete_events_for_calendar_source(db=db, calendar_source_id=cs_id)
+
+        # Now delete the CalendarSource record itself
+        db.query(CalendarSource).filter(CalendarSource.id == cs_id).delete()
+        db.commit()
+
+        return jsonify({"status": "ok", "deleted_calendar_source_id": cs_id}), 200
+
+    except Exception as e:
+        import traceback
+        print("❌ Exception:", traceback.format_exc())
+        return jsonify({"error": "Internal server error"}), 500
 
 
 @orgs_bp.route("/<int:org_id>", methods=["DELETE"])
