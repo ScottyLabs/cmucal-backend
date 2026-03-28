@@ -23,6 +23,9 @@ def create_google_flow(config, state=None, code_verifier=None):
     if code_verifier is not None:
         session_kwargs["code_verifier"] = code_verifier
         session_kwargs["autogenerate_code_verifier"] = False
+    else:
+        # Omitting this makes from_client_config pass None, which disables PKCE generation.
+        session_kwargs["autogenerate_code_verifier"] = True
 
     flow = Flow.from_client_config(
         {
