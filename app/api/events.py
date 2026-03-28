@@ -460,10 +460,11 @@ def get_event_tags(event_id):
 
 @events_bp.route("/", methods=["GET"])
 def get_all_events():
-    term = request.args.get("term").lower()
+    term = request.args.get("term", "").lower()
     tag_ids_raw = request.args.get("tags")
     tag_ids = tag_ids_raw.split(",") if tag_ids_raw else []
     date = request.args.get("date")
+    event_type = request.args.get("event_type")
     # print("🔗🔗🔗😄 ", request.url)
     db = g.db
     try:
@@ -474,17 +475,17 @@ def get_all_events():
         user = get_user_by_clerk_id(db, clerk_id)
 
         # only select some columns to save loading cost
-        events = db.query(Event.id, Event.title, Event.start_datetime, Event.end_datetime, 
-            Event.location, Event.org_id, Event.category_id, Event.event_timezone).join(Event.org)
+        events = db.query(Event.id, Event.title, Event.start_datetime, Event.end_datetime,
+            Event.location, Event.org_id, Event.category_id, Event.event_timezone, Event.event_type).join(Event.org)
 
-        
+
         # if search term is applied, filter results
         if term:
             term_pattern = f"%{term}%"
             events = events.filter(or_(
                 Event.title.ilike(term_pattern),
                 Event.description.ilike(term_pattern),
-                Organization.name.ilike(term_pattern), 
+                Organization.name.ilike(term_pattern),
             ))
 
         # if tags are applied, filter results
@@ -493,8 +494,14 @@ def get_all_events():
 
         # if date is applied, filter results
         if date:
-            # events = events.filter(Event.start_datetime==date)
             events = events.filter(cast(Event.start_datetime, Date) == date)
+
+        # if event_type is applied, filter results
+        if event_type:
+            events = events.filter(Event.event_type == event_type)
+
+        # sort by start_datetime ascending
+        events = events.order_by(Event.start_datetime.asc())
 
         # check for saved events
         if user:
@@ -513,7 +520,8 @@ def get_all_events():
                 "org_id": e[5],
                 "category_id": e[6],
                 "user_saved": e[0] in added_ids,
-                "event_timezone": e[7]
+                "event_timezone": e[7],
+                "event_type": e[8],
             }
             for e in events
         ]
