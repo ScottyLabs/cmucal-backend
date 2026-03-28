@@ -28,6 +28,11 @@ class CourseAgentState(TypedDict):
     verifier_score: Optional[float]
     critic_score: Optional[float]
     heuristic_score: Optional[float]
+    expected_semester: Optional[str]
+    semester_relevance_score: Optional[float]
+    semester_reason: Optional[str]
+    semester_decision: Optional[Literal["match", "mismatch", "ambiguous"]]
+    semester_matched_terms: Optional[List[str]]
     final_score: Optional[float]
 
     terminal_status: Optional[
