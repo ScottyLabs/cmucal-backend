@@ -22,6 +22,7 @@ google_bp = Blueprint("google", __name__)
 @google_bp.route("/authorize")
 def authorize():
     session.pop("credentials", None)
+    session.pop("oauth_code_verifier", None)
     redirect_url = request.args.get("redirect", "http://localhost:3000")
     print("---authorize redirect URL:", redirect_url)
     flow = create_google_flow(current_app.config)
@@ -31,6 +32,9 @@ def authorize():
         prompt="consent"
     )
     session["state"] = state
+    # PKCE: token exchange must send the same verifier used in authorization_url (new Flow on callback).
+    if flow.code_verifier:
+        session["oauth_code_verifier"] = flow.code_verifier
     session["post_auth_redirect"] = redirect_url
     return redirect(authorization_url)
 
@@ -46,7 +50,10 @@ def unauthorize_google():
 @google_bp.route("/oauth/callback")
 def oauth2callback():
     state = session["state"]
-    flow = create_google_flow(current_app.config, state)
+    code_verifier = session.pop("oauth_code_verifier", None)
+    flow = create_google_flow(
+        current_app.config, state=state, code_verifier=code_verifier
+    )
     print("---oauth2callback redirect URL:", request.url)
     flow.fetch_token(authorization_response=request.url)
     session["credentials"] = credentials_to_dict(flow.credentials)

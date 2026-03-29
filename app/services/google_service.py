@@ -15,7 +15,18 @@ SCOPES = [
     "https://www.googleapis.com/auth/calendar.readonly"
 ]
 
-def create_google_flow(config, state=None):
+def create_google_flow(config, state=None, code_verifier=None):
+    """Build OAuth Flow. If ``code_verifier`` is set (callback step), PKCE must match /authorize."""
+    session_kwargs = {}
+    if state is not None:
+        session_kwargs["state"] = state
+    if code_verifier is not None:
+        session_kwargs["code_verifier"] = code_verifier
+        session_kwargs["autogenerate_code_verifier"] = False
+    else:
+        # Omitting this makes from_client_config pass None, which disables PKCE generation.
+        session_kwargs["autogenerate_code_verifier"] = True
+
     flow = Flow.from_client_config(
         {
             "web": {
@@ -27,7 +38,7 @@ def create_google_flow(config, state=None):
             }
         },
         scopes=SCOPES,
-        state=state
+        **session_kwargs,
     )
     flow.redirect_uri = config["GOOGLE_REDIRECT_URI"]
     return flow
