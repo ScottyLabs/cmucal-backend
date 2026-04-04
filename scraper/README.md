@@ -20,6 +20,18 @@
    - **Explicit label(s):** Pass one or more labels, e.g. `python -m scraper.scripts.export_soc Spring_26` or `Spring_26 Fall_25`. Formats: `Spring_xx`, `Fall_xx`, `Summer1_xx`, `Summer2_xx` (same as `get_current_semester` in `semester.py`).
    - **Season flags (only when you are *not* passing labels):** `--spring` scrapes only the `Spring_*` entry from the automatic pair; `--fall` only `Fall_*`; neither flag (or both flags together) uses the full automatic pair.
 
+     Examples:
+
+     | Command | OK? |
+     |--------|-----|
+     | `python -m scraper.scripts.export_soc` | Yes — full automatic pair (same as cron). |
+     | `python -m scraper.scripts.export_soc --spring` | Yes — only Spring from that pair. |
+     | `python -m scraper.scripts.export_soc --fall` | Yes — only Fall from that pair. |
+     | `python -m scraper.scripts.export_soc --spring --fall` | Yes — full pair again (explicit “both”). |
+     | `python -m scraper.scripts.export_soc Spring_26` | Yes — exactly that semester (ignores season flags). |
+     | `python -m scraper.scripts.export_soc Spring_26 Fall_25` | Yes — only those labels. |
+     | `python -m scraper.scripts.export_soc Spring_26 --spring` | No — parser error; use either explicit labels **or** `--spring`/`--fall`, not both. |
+
    Use `python -m scraper.scripts.export_soc -h` for the full CLI help.
 
 3. The script creates org and category for each SOC event if those don’t exist, then adds events, recurrence rules, and calls an endpoint to generate event occurrences. Generating all events can take around an hour; keep the terminal open during that time.
