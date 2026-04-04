@@ -8,12 +8,21 @@
 `python exporters/schedule_of_classes_export_to_excel.py` -->
 ## Development Environment
 1. Activate the virtual environment at the root directory
-2. If running the schedule of classes scraper, make sure to change the semester_label in `scraper = ScheduleOfClassesScraper(db, semester_label="Spring_26")`. 
-    - Acceptable formats include `Spring_xx`, `Fall_xx`, `Summer1_xx`, `Summer2_xx`.
-    - Feel free to change the start and end dates of each semester in `scraper/helpers/semester.py` if needed.
-3. Run `python -m scraper.scripts.export_soc` to scrape data and add events to the DB.
-    - the script first creates org and category for each SOC event if those don't exist, then add events, recurrence_rules, and calls an endpoint to generate event occurrences.
-    - generating all events could take around an hour, please keep the terminal open during that time.
+2. Run the Schedule of Classes export from the **backend root** (`cmucal-backend`), not inside `scraper/`:
+
+   ```bash
+   python -m scraper.scripts.export_soc
+   ```
+
+   **Semester selection (no code edits needed):**
+
+   - **Default (cron-friendly):** With no arguments, the script picks the current and next major term (Spring and Fall layouts) from today’s date. Logic lives in `scraper/helpers/semester.py` (`infer_soc_semester_labels`). Adjust start/end dates there if CMU’s calendar drifts.
+   - **Explicit label(s):** Pass one or more labels, e.g. `python -m scraper.scripts.export_soc Spring_26` or `Spring_26 Fall_25`. Formats: `Spring_xx`, `Fall_xx`, `Summer1_xx`, `Summer2_xx` (same as `get_current_semester` in `semester.py`).
+   - **Season flags (only when you are *not* passing labels):** `--spring` scrapes only the `Spring_*` entry from the automatic pair; `--fall` only `Fall_*`; neither flag (or both flags together) uses the full automatic pair.
+
+   Use `python -m scraper.scripts.export_soc -h` for the full CLI help.
+
+3. The script creates org and category for each SOC event if those don’t exist, then adds events, recurrence rules, and calls an endpoint to generate event occurrences. Generating all events can take around an hour; keep the terminal open during that time.
 
 * If need to delete, run this:
 ```
@@ -23,7 +32,7 @@ curl -X DELETE http://localhost:5001/api/events/batch_delete_events_by_params \
 ```
 
 ## Production Environment
-- created a cron job on Railway that calls `python -m scraper.scripts.export_soc`
+- Cron on Railway runs `python -m scraper.scripts.export_soc` with **no arguments**, so each run uses the automatic Spring/Fall pair for the current date. Override locally or in a one-off job with explicit labels or `--spring` / `--fall` if needed.
 
 # Old README
 
