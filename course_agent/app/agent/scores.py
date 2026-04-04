@@ -22,3 +22,20 @@ def heuristic_score(url: str, html: str) -> float:
         score -= 0.5
 
     return max(0.0, min(score, 1.0))
+
+
+def apply_semester_match_boost(
+    base_score: float,
+    semester_decision: str | None,
+    boost: float = 0.1,
+) -> float:
+    """Apply boost-only semester adjustment.
+
+    - Explicit match: add a small boost.
+    - Ambiguous or mismatch: no penalty here.
+      (Mismatch is handled by strict rejection upstream.)
+    """
+    adjusted = base_score
+    if semester_decision == "match":
+        adjusted += boost
+    return max(0.0, min(adjusted, 1.0))

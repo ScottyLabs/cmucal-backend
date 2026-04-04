@@ -70,7 +70,6 @@ def test_agent_rejects_first_site_and_continues(
     ca_base_state,
 ):
     from course_agent.app.agent.nodes.verify_site import verify_site_node
-    from course_agent.app.agent.nodes.critic import critic_node
 
     state = {
         **ca_base_state,
@@ -112,11 +111,11 @@ def test_agent_rejects_first_site_and_continues(
     )
 
     state = verify_site_node(state)
-    state = critic_node(state)
 
     assert state['current_url_index'] == 1
     assert state['proposed_site_id'] is None
     assert state['done'] is False
+    assert state['semester_decision'] == 'mismatch'
 
 def test_no_site_found_when_search_empty(
     mocker,
@@ -192,3 +191,79 @@ def test_site_without_calendar(
     state = agent.invoke(ca_base_state)
 
     assert state['terminal_status'] == 'no_calendar'
+
+
+def test_extract_calendar_falls_back_to_internal_pages(
+    mocker,
+    ca_base_state,
+):
+    from course_agent.app.agent.nodes.extract_calendar import extract_calendar_node
+
+    state = {
+        **ca_base_state,
+        'verified_site_id': 'site-1',
+        'verified_site_url': 'https://course.example.edu',
+        'verified_site_html': '<html>No calendar on homepage</html>',
+    }
+
+    mocker.patch(
+        'course_agent.app.agent.nodes.extract_calendar.crawl_site_pages',
+        return_value=[
+            {
+                'url': 'https://course.example.edu',
+                'html': '<html>No calendar on homepage</html>',
+                'depth': 0,
+            },
+            {
+                'url': 'https://course.example.edu/schedule',
+                'html': '<iframe src="https://calendar.google.com/calendar/embed?src=test@cmu.edu"></iframe>',
+                'depth': 1,
+            },
+        ],
+    )
+    upsert_mock = mocker.patch(
+        'course_agent.app.agent.nodes.extract_calendar.upsert_calendar_source'
+    )
+
+    out = extract_calendar_node(state)
+
+    assert out['terminal_status'] == 'success'
+    assert out['calendar_page_url'] == 'https://course.example.edu/schedule'
+    assert out['pages_scanned'] == 2
+    assert out['ical_link'].endswith('.ics')
+    upsert_mock.assert_called_once()
+
+
+def test_extract_calendar_returns_no_calendar_after_crawl(
+    mocker,
+    ca_base_state,
+):
+    from course_agent.app.agent.nodes.extract_calendar import extract_calendar_node
+
+    state = {
+        **ca_base_state,
+        'verified_site_id': 'site-1',
+        'verified_site_url': 'https://course.example.edu',
+        'verified_site_html': '<html>No calendar on homepage</html>',
+    }
+
+    mocker.patch(
+        'course_agent.app.agent.nodes.extract_calendar.crawl_site_pages',
+        return_value=[
+            {
+                'url': 'https://course.example.edu',
+                'html': '<html>No calendar on homepage</html>',
+                'depth': 0,
+            },
+            {
+                'url': 'https://course.example.edu/logistics',
+                'html': '<html>Still no calendar here</html>',
+                'depth': 1,
+            },
+        ],
+    )
+
+    out = extract_calendar_node(state)
+
+    assert out['terminal_status'] == 'no_calendar'
+    assert out['pages_scanned'] == 2

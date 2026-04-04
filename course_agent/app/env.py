@@ -26,3 +26,17 @@ def get_api_base_url() -> str:
     if not url:
         raise RuntimeError("API_BASE_URL is not set")
     return url.rstrip("/")
+
+
+def get_target_semester_override() -> str | None:
+    """Optional semester override (e.g., "Spring 2026").
+
+    Returns None when unset or blank so callers can fall back to
+    date-based semester inference.
+    """
+    value = os.getenv("TARGET_SEMESTER")
+    if not value:
+        return None
+
+    cleaned = value.strip()
+    return cleaned or None
