@@ -22,6 +22,8 @@ class CourseAgentState(TypedDict):
 
     iframe_url: Optional[str]
     ical_link: Optional[str]
+    calendar_page_url: Optional[str]
+    pages_scanned: Optional[int]
 
     critic_decision: Optional[str]  # "accept" | "reject"
 
