@@ -1,5 +1,5 @@
 import datetime
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 
 SEMESTER_CONFIG = {
@@ -59,3 +59,35 @@ def get_current_semester(
         start,
         end,
     )
+
+
+def infer_soc_semester_labels(
+    today: Optional[datetime.date] = None,
+) -> List[str]:
+    """
+    SOC publishes separate Spring and Fall layouts. Return labels for the
+    current calendar window and the next major term so cron runs stay fresh
+    without manual edits.
+
+    - Jan–May: Spring (this year) then Fall (this year).
+    - Jun–Jul: Spring (this year, just ended / winding down) then Fall (this year).
+    - Aug–Dec: Fall (this year) then Spring (next year), e.g. December → Fall + Spring.
+
+    Labels match get_current_semester format, e.g. Spring_26, Fall_25.
+    """
+    d = today or datetime.date.today()
+    y = d.year
+    yy = f"{y % 100:02d}"
+
+    if d.month >= 8:
+        fall = f"Fall_{yy}"
+        spring_next = f"Spring_{(y + 1) % 100:02d}"
+        return [fall, spring_next]
+    if 1 <= d.month <= 5:
+        spring = f"Spring_{yy}"
+        fall = f"Fall_{yy}"
+        return [spring, fall]
+    # June–July: upcoming Fall and the Spring that just ended (same calendar year).
+    spring = f"Spring_{yy}"
+    fall = f"Fall_{yy}"
+    return [spring, fall]
